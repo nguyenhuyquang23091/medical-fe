@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button"
 import ShadcnDatePicker from "@/components/ui/shadcn-date-picker"
 import { useState } from "react"
 import { useAuth } from "../../app/context/AuthContext"
+import { RegisterData } from "@/api/auth"
+import { registerSchema } from "@/lib/validation"
+import { z } from "zod";
 
 export default function RegisterModal() {
-  const { isRegisterModalOpen, closeRegisterModal, switchToLogin } = useAuth();
+  const { isRegisterModalOpen, closeRegisterModal, switchToLogin, register } = useAuth();
   // Add state for form fields
   const [formData, setFormData] = useState({
     firstName: '',
@@ -18,6 +21,8 @@ export default function RegisterModal() {
     password: ''
   });
   const [birthdate, setBirthdate] = useState<Date>(new Date(2000, 0, 1));
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -31,15 +36,39 @@ export default function RegisterModal() {
     setBirthdate(date);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
-    // Handle registration
-    console.log({
-      ...formData,
-      birthdate
-    });
-    // After successful registration, you would typically close the modal or switch to login
-    // closeRegisterModal();
+    
+    const formattedDate = birthdate.toISOString().split('T')[0];
+
+    try {
+      const result = registerSchema.parse({
+        ...formData,
+        dob: formattedDate
+      });
+
+      setErrors({});
+      const registerData: RegisterData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        dob: formattedDate,
+      };  
+      await register(registerData);
+    } catch(error) {
+      if (error instanceof z.ZodError) {
+        const fieldErrors: Record<string, string> = {};
+        
+        error.errors.forEach((err) => {
+          const field = err.path[0];
+          fieldErrors[field as string] = err.message;
+        });
+        setErrors(fieldErrors);
+      } else {
+        setRegisterError("Unexpected error");
+        console.error("Validation Error", error);
+      }
+    }
   };
 
   if (!isRegisterModalOpen) return null;
@@ -62,26 +91,39 @@ export default function RegisterModal() {
           </CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleSubmit}>
+              {registerError && (
+                <div className="text-red-500 text-sm mb-4">
+                  {registerError}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="first-name">First name</Label>
+                  <Label htmlFor="firstName">First name</Label>
                   <Input 
                     id="firstName" 
                     placeholder="Lee" 
                     required 
                     value={formData.firstName}
                     onChange={handleInputChange}
+                    className={errors.firstName ? "border-red-500" : ""}
                   />
+                  {errors.firstName && (
+                    <p className="text-red-500 text-xs">{errors.firstName}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last-name">Last name</Label>
+                  <Label htmlFor="lastName">Last name</Label>
                   <Input 
                     id="lastName" 
                     placeholder="Robinson" 
                     required
                     value={formData.lastName}
                     onChange={handleInputChange}
+                    className={errors.lastName ? "border-red-500" : ""}
                   />
+                  {errors.lastName && (
+                    <p className="text-red-500 text-xs">{errors.lastName}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="username">Username</Label>
@@ -91,7 +133,11 @@ export default function RegisterModal() {
                     required
                     value={formData.username}
                     onChange={handleInputChange}
+                    className={errors.username ? "border-red-500" : ""}
                   />
+                  {errors.username && (
+                    <p className="text-red-500 text-xs">{errors.username}</p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2 mt-4">
@@ -99,11 +145,15 @@ export default function RegisterModal() {
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="m@example.com" 
+                  placeholder="@gmail.com" 
                   required
                   value={formData.email}
                   onChange={handleInputChange}
+                  className={errors.email ? "border-red-500" : ""}
                 />
+                {errors.email && (
+                  <p className="text-red-500 text-xs">{errors.email}</p>
+                )}
               </div>
               <div className="space-y-2 mt-4">
                 <Label>Date of Birth</Label>
@@ -124,7 +174,11 @@ export default function RegisterModal() {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
+                  className={errors.password ? "border-red-500" : ""}
                 />
+                {errors.password && (
+                  <p className="text-red-500 text-xs">{errors.password}</p>
+                )}
               </div>
               <CardFooter className="px-0 pt-4">
                 <Button type="submit" className="w-full hover:cursor-pointer hover:bg-blue-500">Register</Button>
@@ -146,3 +200,6 @@ export default function RegisterModal() {
     </div>
   )
 }
+
+
+

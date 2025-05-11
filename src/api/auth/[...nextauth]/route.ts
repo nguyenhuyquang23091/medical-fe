@@ -1,7 +1,10 @@
 import NextAuth from "next-auth"
 import type { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials"
-import apiClient from "@/app/libs/apiClient"
+import apiClient from "@/lib/apiClient"
+
+
+//This next auth handle login session/send token to BE
 
 // Extend NextAuth types
 declare module "next-auth" {

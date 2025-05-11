@@ -6,6 +6,7 @@ import Footer from "@/components/footer/footer"
 import { AuthProvider } from "@/app/context/AuthContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
+import Providers from "./providers";
 
 
 const montserrat = Montserrat({subsets:['latin']})
@@ -17,7 +18,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={montserrat.className}>
       <body>
-        <AuthProvider>
+       <Providers>
+          <AuthProvider>
+
         <div >
             <Navbar />
             <main>
@@ -28,6 +31,8 @@ export default function RootLayout({
             <RegisterModal/>
         </div>
         </AuthProvider>
+        </Providers>
+       
       </body>
     </html>
   )

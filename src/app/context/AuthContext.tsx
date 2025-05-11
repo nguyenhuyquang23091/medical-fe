@@ -1,7 +1,10 @@
 "use client"
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, use } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Session } from 'next-auth';
+import apiClient from '@/lib/apiClient';
+import authService, {RegisterData} from '@/api/auth';
+
 
 // Shape of the context
 type AuthContextType = {
@@ -15,10 +18,13 @@ type AuthContextType = {
   switchToLogin: () => void;
   isLoggedIn: boolean;
   login: (identifier: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
   session: Session | null;
   status: "loading" | "authenticated" | "unauthenticated";
   loginError: string | null;
+  registerError: string | null;
+  isLoading: boolean;
 };
 
 // Create the context
@@ -33,12 +39,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   const closeLoginModal = () => {
     setLoginError(null);
     setIsLoginModalOpen(false);
   };
 
+  const closeRegisterModal = () => {
+    setLoginError(null);
+    setIsRegisterModalOpen(false);
+  };
   //need to learn about Promise/ undefinied, and session
   
   const login = async (identifier: string, password: string) => {
@@ -59,9 +71,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoginError('An unexpected error occurred');
     }
   };
+  const register = async ( data: RegisterData): Promise<boolean> => {
+    setIsLoading(true);
+    setRegisterError(null);
+
+    try{
+      const result = await authService.register(data);
+      if (result) {
+
+        closeRegisterModal();
+        switchToLogin();
+        return true;
+      } else {
+        setRegisterError("Registeration Failed");
+        return false;
+      } 
+    } catch (error) {
+      console.error('Registration error', error);
+      setRegisterError('An unexpected error occurred');
+      return false;
+    }
+  }
+
 
   const logout = async () => {
-    await signOut({ redirect: false });
+    setIsLoading(true)
+    try{
+      await signOut({ redirect: false });
+    }catch (error) {
+      console.error("Error during logout", error);
+    }
   };
 
   const openLoginModal = () => {
@@ -75,20 +114,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsRegisterModalOpen(true);
     setIsLoginModalOpen(false);
   };
-  
-  const closeRegisterModal = () => {
-    setLoginError(null);
-    setIsRegisterModalOpen(false);
-  };
 
   const switchToRegister = () => {
     setLoginError(null);
+    setRegisterError(null);
     setIsRegisterModalOpen(true);
     setIsLoginModalOpen(false);
   };
   
   const switchToLogin = () => {
     setLoginError(null);
+    setRegisterError(null);
     setIsRegisterModalOpen(false);
     setIsLoginModalOpen(true);
   };
@@ -105,10 +141,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     switchToLogin,
     isLoggedIn: status === 'authenticated',
     login, 
+    register,
     logout,
     session,
     status,
     loginError,
+    registerError,
+    isLoading
   };
 
   return (
