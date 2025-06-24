@@ -1,0 +1,78 @@
+import httpClient from "@/lib/apiClient";
+import { API } from "@/lib/config/configuration";
+
+// Match BE DTO structure exactly
+export interface ChatbotRequest {
+    content: string;
+    conversationId?: string | null;
+}
+
+// Backend API response structure
+interface ApiResponse {
+    code: number;
+    result: {
+        assistantMessage: string;
+        conversationId: string;
+    }
+}
+
+export interface ChatMessage {
+    content: string;
+    isBot: boolean;
+}
+
+const CONVERSATION_ID_KEY = "chatbot_conversation_id";
+
+const chatbotService = {
+    // Get stored conversation ID
+    getConversationId: (): string | null => {
+        return localStorage.getItem(CONVERSATION_ID_KEY);
+    },
+
+    // Main ask function
+    ask: async (content: string): Promise<ApiResponse> => {
+        try {
+            // Get existing conversation ID if available
+            const conversationId = chatbotService.getConversationId();
+            
+            // Prepare request matching BE DTO
+            const request: ChatbotRequest = {
+                content,
+                conversationId: conversationId
+            };
+
+            console.log('Sending request to chatbot API:', request);
+            // Make API call and return an ApiResponse similar to BE
+            const response = await httpClient.post<ApiResponse>(API.CHATBOT, request);
+            console.log('API Response:', response.data);
+          
+         
+            
+            // Check if we have a valid response structure
+            if (!response.data || !response.data.result) {
+                throw new Error('Invalid response structure from API');
+            }
+            
+            // Extract the nested result
+            const result = response.data.result;
+            
+            // Store new conversation ID if provided
+            if (result.conversationId) {
+                localStorage.setItem(CONVERSATION_ID_KEY, result.conversationId);
+            }
+
+            return {
+                code: response.data.code,
+                result: {
+                    assistantMessage : result.assistantMessage,
+                    conversationId : result.conversationId
+                }
+            };
+        } catch (error) {
+            console.error("Error in chatbot communication:", error);
+            throw error;
+        }
+    }
+};
+
+export default chatbotService;

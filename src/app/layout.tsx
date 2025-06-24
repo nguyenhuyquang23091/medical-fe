@@ -7,6 +7,8 @@ import { AuthProvider } from "@/app/context/AuthContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import Providers from "./providers";
+import { Toaster } from "@/components/ui/sonner";
+import ChatBot from "@/components/chatBot/chatBot";
 
 
 const montserrat = Montserrat({subsets:['latin']})
@@ -29,6 +31,8 @@ export default function RootLayout({
             <Footer/>
             <LoginModal/>
             <RegisterModal/>
+            <ChatBot/>
+            <Toaster position="top-right" />
         </div>
         </AuthProvider>
         </Providers>

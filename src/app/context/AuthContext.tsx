@@ -1,10 +1,10 @@
 "use client"
-import React, { createContext, useContext, useState, ReactNode, useEffect, use } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Session } from 'next-auth';
-import apiClient from '@/lib/apiClient';
-import authService, {RegisterData} from '@/api/auth';
-
+import authService, {RegisterData} from '@/services/auth/auth';
+import { ERROR_MESSAGES } from '@/errors/errorCode';
+import axios from 'axios';
 
 // Shape of the context
 type AuthContextType = {
@@ -48,13 +48,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const closeRegisterModal = () => {
-    setLoginError(null);
+    setRegisterError(null);
     setIsRegisterModalOpen(false);
   };
-  //need to learn about Promise/ undefinied, and session
   
   const login = async (identifier: string, password: string) => {
     try {
+      setIsLoading(true);
+      setLoginError(null);
+      
       const result = await signIn('credentials', {
         identifier,
         password,
@@ -62,44 +64,61 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (result?.error) {
+        // The error here is already a user-friendly message from NextAuth
+        // It comes from the throw new Error() in the authorize function
         setLoginError(result.error);
+        console.error("Authentication error:", result.error);
       } else {
         closeLoginModal();
       }
     } catch (error) {
       console.error('Login error', error);
-      setLoginError('An unexpected error occurred');
+      // Use the generic error code for unexpected errors
+      setLoginError(ERROR_MESSAGES[9999]);
+    } finally {
+      setIsLoading(false);
     }
   };
-  const register = async ( data: RegisterData): Promise<boolean> => {
+  
+  const register = async (data: RegisterData): Promise<boolean> => {
     setIsLoading(true);
     setRegisterError(null);
 
-    try{
+    try {
       const result = await authService.register(data);
+      console.log("Registration success:", result);
       if (result) {
-
         closeRegisterModal();
         switchToLogin();
         return true;
       } else {
-        setRegisterError("Registeration Failed");
+        console.log("Registration result was falsy");
+        setRegisterError(ERROR_MESSAGES[1001]); // User already exists
         return false;
       } 
     } catch (error) {
       console.error('Registration error', error);
-      setRegisterError('An unexpected error occurred');
+      if(error && typeof error === 'object' && 'code' in error){
+        const errorCode = Number(error.code) || 9999;
+        setRegisterError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES[9999]);
+      } else {
+        setRegisterError(ERROR_MESSAGES[9999]);
+      }
       return false;
+    } finally {
+      setIsLoading(false);
     }
-  }
-
+  };
 
   const logout = async () => {
-    setIsLoading(true)
-    try{
+    setIsLoading(true);
+    try {
+      await authService.logout();
       await signOut({ redirect: false });
-    }catch (error) {
+    } catch (error) {
       console.error("Error during logout", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -110,7 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
   
   const openRegisterModal = () => {
-    setLoginError(null);
+    setRegisterError(null);
     setIsRegisterModalOpen(true);
     setIsLoginModalOpen(false);
   };

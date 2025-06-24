@@ -4,14 +4,17 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import ShadcnDatePicker from "@/components/ui/shadcn-date-picker"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "../../app/context/AuthContext"
-import { RegisterData } from "@/api/auth"
+import { RegisterData } from "@/services/auth/auth"
 import { registerSchema } from "@/lib/validation"
 import { z } from "zod";
+import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
+import { AlertTriangle } from "lucide-react"
 
 export default function RegisterModal() {
-  const { isRegisterModalOpen, closeRegisterModal, switchToLogin, register } = useAuth();
+  const { isRegisterModalOpen, closeRegisterModal, switchToLogin, register, registerError, isLoading } = useAuth();
   // Add state for form fields
   const [formData, setFormData] = useState({
     firstName: '',
@@ -21,8 +24,22 @@ export default function RegisterModal() {
     password: ''
   });
   const [birthdate, setBirthdate] = useState<Date>(new Date(2000, 0, 1));
-  const [registerError, setRegisterError] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Reset form errors when modal opens/closes
+  useEffect(() => {
+    if (isRegisterModalOpen) {
+      setFormErrors({});
+    }
+  }, [isRegisterModalOpen]);
+  
+  // Add a useEffect to log when registerError changes
+  useEffect(() => {
+    if (registerError) {
+      console.log("RegisterError updated:", registerError);
+    }
+  }, [registerError]);
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -40,34 +57,53 @@ export default function RegisterModal() {
     e.preventDefault();
     
     const formattedDate = birthdate.toISOString().split('T')[0];
-
+    setSubmitting(true);
+    setFormErrors({});
+    
     try {
       const result = registerSchema.parse({
         ...formData,
         dob: formattedDate
       });
 
-      setErrors({});
       const registerData: RegisterData = {
         username: formData.username,
         email: formData.email,
         password: formData.password,
         dob: formattedDate,
       };  
-      await register(registerData);
+      
+      // Show loading toast
+      const loadingToast = toast.loading('Creating your account...');
+      
+      const success = await register(registerData);
+      
+      // Dismiss loading toast
+      toast.dismiss(loadingToast);
+      
+      // If successful, the success message will be handled by AuthContext
+      if (success) {
+        toast.success('Account created successfully! Please log in.');
+      } else {
+        // If we get here with no registerError, something else failed
+        console.log("Registration returned false but no error was set");
+      }
     } catch(error) {
       if (error instanceof z.ZodError) {
+        // Handle form validation errors
         const fieldErrors: Record<string, string> = {};
         
         error.errors.forEach((err) => {
           const field = err.path[0];
           fieldErrors[field as string] = err.message;
         });
-        setErrors(fieldErrors);
-      } else {
-        setRegisterError("Unexpected error");
-        console.error("Validation Error", error);
+        setFormErrors(fieldErrors);
+      } else if (error instanceof Error) {
+        // This could be the error from the API
+        console.log("Error message:", error.message);
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -83,6 +119,7 @@ export default function RegisterModal() {
               <button 
                 onClick={closeRegisterModal}
                 className="text-gray-400 hover:text-gray-600"
+                aria-label="Close registration modal"
               >
                 ✕
               </button>
@@ -92,8 +129,9 @@ export default function RegisterModal() {
           <CardContent className="space-y-4">
             <form onSubmit={handleSubmit}>
               {registerError && (
-                <div className="text-red-500 text-sm mb-4">
-                  {registerError}
+                <div className="flex items-start space-x-2 text-red-600 text-sm mb-4 p-3 bg-red-50 rounded border border-red-200">
+                  <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <span>{registerError}</span>
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">
@@ -105,10 +143,11 @@ export default function RegisterModal() {
                     required 
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className={errors.firstName ? "border-red-500" : ""}
+                    className={formErrors.firstName ? "border-red-500" : ""}
+                    disabled={submitting || isLoading}
                   />
-                  {errors.firstName && (
-                    <p className="text-red-500 text-xs">{errors.firstName}</p>
+                  {formErrors.firstName && (
+                    <p className="text-red-500 text-xs">{formErrors.firstName}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -119,10 +158,11 @@ export default function RegisterModal() {
                     required
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className={errors.lastName ? "border-red-500" : ""}
+                    className={formErrors.lastName ? "border-red-500" : ""}
+                    disabled={submitting || isLoading}
                   />
-                  {errors.lastName && (
-                    <p className="text-red-500 text-xs">{errors.lastName}</p>
+                  {formErrors.lastName && (
+                    <p className="text-red-500 text-xs">{formErrors.lastName}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -133,10 +173,11 @@ export default function RegisterModal() {
                     required
                     value={formData.username}
                     onChange={handleInputChange}
-                    className={errors.username ? "border-red-500" : ""}
+                    className={formErrors.username ? "border-red-500" : ""}
+                    disabled={submitting || isLoading}
                   />
-                  {errors.username && (
-                    <p className="text-red-500 text-xs">{errors.username}</p>
+                  {formErrors.username && (
+                    <p className="text-red-500 text-xs">{formErrors.username}</p>
                   )}
                 </div>
               </div>
@@ -149,10 +190,11 @@ export default function RegisterModal() {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={errors.email ? "border-red-500" : ""}
+                  className={formErrors.email ? "border-red-500" : ""}
+                  disabled={submitting || isLoading}
                 />
-                {errors.email && (
-                  <p className="text-red-500 text-xs">{errors.email}</p>
+                {formErrors.email && (
+                  <p className="text-red-500 text-xs">{formErrors.email}</p>
                 )}
               </div>
               <div className="space-y-2 mt-4">
@@ -174,14 +216,28 @@ export default function RegisterModal() {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={errors.password ? "border-red-500" : ""}
+                  className={formErrors.password ? "border-red-500" : ""}
+                  disabled={submitting || isLoading}
                 />
-                {errors.password && (
-                  <p className="text-red-500 text-xs">{errors.password}</p>
+                {formErrors.password && (
+                  <p className="text-red-500 text-xs">{formErrors.password}</p>
                 )}
               </div>
               <CardFooter className="px-0 pt-4">
-                <Button type="submit" className="w-full hover:cursor-pointer hover:bg-blue-500">Register</Button>
+                <Button 
+                  type="submit" 
+                  className="w-full hover:cursor-pointer hover:bg-blue-500"
+                  disabled={submitting || isLoading}
+                >
+                  {(submitting || isLoading) ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Register"
+                  )}
+                </Button>
               </CardFooter>
               <div className="text-center text-sm mt-4">
                 Already have an account?{" "}
@@ -189,6 +245,7 @@ export default function RegisterModal() {
                   type="button"
                   onClick={switchToLogin} 
                   className="text-blue-500 hover:underline focus:outline-none hover:cursor-pointer"
+                  disabled={submitting || isLoading}
                 >
                   Login
                 </button>
