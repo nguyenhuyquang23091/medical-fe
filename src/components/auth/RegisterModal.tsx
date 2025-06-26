@@ -3,15 +3,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import ShadcnDatePicker from "@/components/ui/shadcn-date-picker"
+import { DatePicker } from "@/components/ui/date-picker"
 import { useState, useEffect } from "react"
 import { useAuth } from "../../app/context/AuthContext"
 import { RegisterData } from "@/services/auth/auth"
 import { registerSchema } from "@/lib/validation"
 import { z } from "zod";
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
-import { AlertTriangle } from "lucide-react"
+import { Loader2, AlertTriangle } from "lucide-react"
 
 export default function RegisterModal() {
   const { isRegisterModalOpen, closeRegisterModal, switchToLogin, register, registerError, isLoading } = useAuth();
@@ -51,27 +50,31 @@ export default function RegisterModal() {
   
   const handleDateChange = (date: Date) => {
     setBirthdate(date);
+    console.log("Date selected:", date, date.toISOString().split('T')[0]);
   };
 
   const handleSubmit = async(e: React.FormEvent) => {
     e.preventDefault();
     
     const formattedDate = birthdate.toISOString().split('T')[0];
+    console.log("Submitting date:", formattedDate);
     setSubmitting(true);
     setFormErrors({});
     
     try {
-      const result = registerSchema.parse({
-        ...formData,
-        dob: formattedDate
-      });
+     const dataToValidate = {
+      ...formData,
+      dob: formattedDate,
+     }
 
-      const registerData: RegisterData = {
-        username: formData.username,
-        email: formData.email,
-        password: formData.password,
-        dob: formattedDate,
-      };  
+      const validateData = registerSchema.parse(dataToValidate);
+    
+      const registerData : RegisterData  = {
+        username : validateData.username,
+        email : validateData.email,
+        password : validateData.password,
+        dob : validateData.dob
+      }
       
       // Show loading toast
       const loadingToast = toast.loading('Creating your account...');
@@ -198,15 +201,17 @@ export default function RegisterModal() {
                 )}
               </div>
               <div className="space-y-2 mt-4">
-                <Label>Date of Birth</Label>
-                <div className="mt-1">
-                  <ShadcnDatePicker
-                    startYear={1920}
-                    endYear={2023}
-                    selected={birthdate}
-                    onSelect={handleDateChange}
-                  />
-                </div>
+                <DatePicker
+                   label="Date of Birth" 
+                   selected={birthdate}
+                   onSelect={handleDateChange}
+                   placeholder="Select your birth date"
+                   id="dob"
+                   fromYear={1920}
+                   toYear={2023}
+                   disabled={submitting || isLoading}
+                />
+              
               </div>
               <div className="space-y-2 mt-4">
                 <Label htmlFor="password">Password</Label>

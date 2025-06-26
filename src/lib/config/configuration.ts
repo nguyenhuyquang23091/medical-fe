@@ -6,3 +6,8 @@ export const API = {
     CHATBOT: "/chatbot/chat",
     PROFILE : "/profile/users"
 }
+
+export const PUBLIC_ENDPOINT  = new Set([
+    API.REGISTRATION,
+    API.LOGIN
+]);
