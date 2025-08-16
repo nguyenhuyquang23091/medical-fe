@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { Edit, Save, X, User, Calendar, MapPin, Mail, Phone, Loader2, Link, Globe, Download, Settings } from "lucide-react"
-import profileService, { ProfileResponse, ProfileUpdateRequest } from "@/services/profile/profile"
+import { MapPin, Mail, Phone, Loader2, Globe, UserRoundPen, Camera, Eye, EyeOff } from "lucide-react"
+import { ProfileUpdateRequest, AuthDataUpdateRequest } from "@/types"
+import { useUserProfile } from "@/app/context/UserProfileContext"
+import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -21,51 +22,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DatePicker } from "@/components/ui/date-picker"
+
 
 export default function ProfilePage() {
-  const [isEditing, setIsEditing] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: session, status } = useSession()
+  const { userProfile: profileData, authData, isLoading: contextLoading, userProfileError, updateUserProfile, updateAuthCredential, updateAvatar } = useUserProfile()
   const [isSaving, setIsSaving] = useState(false)
-  const [profileData, setProfileData] = useState<ProfileResponse | null>(null)
   const [editData, setEditData] = useState<ProfileUpdateRequest>({
     firstName: "",
     lastName: "",
     dob: "",
     city: "",
   })
-  const [error, setError] = useState<string | null>(null)
-  const [profileCompletion, setProfileCompletion] = useState(66)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [editAuthData, setEditAuthData] = useState<AuthDataUpdateRequest>({
+    username: "",
+    password: "",
+    email: ""
+  })
+  const [profileCompletion] = useState(66)
+  const [settingsTab, setSettingsTab] = useState<"profile" | "account">("profile")
+  const [showPassword, setShowPassword] = useState(false)
 
+
+  // Initialize edit data when profile data is loaded
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        setIsLoading(true)
-        setError(null)
-        const data = await profileService.getProfile()
-        setProfileData(data)
-        setEditData({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          dob: data.dob,
-          city: data.city,
-        })
-      } catch (err) {
-        console.error("Failed to fetch profile:", err)
-        setError("Failed to load profile data. Please try again later.")
-        toast.error("Failed to load profile data")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchProfile()
-  }, [])
-
-  const handleEdit = () => {
     if (profileData) {
       setEditData({
         firstName: profileData.firstName,
@@ -74,24 +54,64 @@ export default function ProfilePage() {
         city: profileData.city,
       })
     }
-    setIsEditing(true)
-  }
+  }, [profileData])
+
+  useEffect(() => {
+    if (authData) {
+      setEditAuthData({
+        username: authData.username,
+        password: "",
+        email: authData.email,
+      })
+    }
+  }, [authData])
+
+ 
 
   const handleSave = async () => {
-    if (!editData.firstName || !editData.lastName || !editData.dob || !editData.city) {
-      toast.error("All fields are required")
-      return
-    }
-
     try {
       setIsSaving(true)
-      const updatedProfile = await profileService.updateProfile(editData)
-      setProfileData(updatedProfile)
-      setIsEditing(false)
-      toast.success("Profile updated successfully")
+      
+      // Determine which tab is active to know what to update
+      if (settingsTab === "profile") {
+        // Validate profile data
+        if (!editData.firstName || !editData.lastName || !editData.dob || !editData.city) {
+          toast.error("All profile fields are required")
+          setIsSaving(false)
+          return
+        }
+        
+        // Update profile data using context
+        await updateUserProfile(editData)
+        toast.success("Profile updated successfully")
+      } else if (settingsTab === "account") {
+        // Validate account data
+        if (!editAuthData.username || !editAuthData.email) {
+          toast.error("Username and email are required")
+          setIsSaving(false)
+          return
+        }
+        
+        // Create auth update data
+        const updateData: AuthDataUpdateRequest = {
+          username: editAuthData.username,
+          email: editAuthData.email,
+          password: editAuthData.password || ""
+        }
+        
+        // Update auth data using context
+        await updateAuthCredential(updateData)
+        toast.success("Account updated successfully")
+        
+        // Reset password field after successful update
+        setEditAuthData({
+          ...editAuthData,
+          password: ""
+        })
+      }
     } catch (err) {
-      console.error("Failed to update profile:", err)
-      toast.error("Failed to update profile. Please try again.")
+      console.error("Failed to update:", err)
+      toast.error("Failed to update. Please try again.")
     } finally {
       setIsSaving(false)
     }
@@ -106,41 +126,79 @@ export default function ProfilePage() {
         city: profileData.city,
       })
     }
-    setIsEditing(false)
   }
 
   const handleInputChange = (field: keyof ProfileUpdateRequest, value: string) => {
     setEditData((prev) => ({ ...prev, [field]: value }))
   }
 
-  const formatDate = (dateString: string) => {
-    try {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    } catch (e) {
-      return dateString
-    }
-  }
 
   const getInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
   }
 
-  if (isLoading) {
+  const handleSettingsTabChange = (tab: "profile" | "account") => {
+    setSettingsTab(tab);
+  };
+
+  const handleAvatarUpload = async(event : React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if(!file) return;
+
+    if(!file.type.match("image.*")){
+      toast.error("Please upload a valid image file.");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File size must be less than 5MB");
+      return;
+    }
+
+    try {
+      await updateAvatar(file);
+      toast.success("Avatar uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      toast.error("Failed to upload avatar. Please try again.");
+    }
+  };
+
+  // Handle authentication states
+  if (status === "loading") {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-gray-600">Loading profile...</p>
+          <p className="text-gray-600">Checking authentication...</p>
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (status === "unauthenticated") {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-orange-600">Authentication Required</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Please log in to view your profile.</p>
+            <Button 
+              onClick={() => window.location.href = "/login"} 
+              className="mt-4 bg-blue-600 hover:bg-blue-700"
+            >
+              Go to Login
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (userProfileError) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <Card className="w-full max-w-md">
@@ -148,7 +206,7 @@ export default function ProfilePage() {
             <CardTitle className="text-red-600">Error</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>{error}</p>
+            <p>{userProfileError}</p>
             <Button 
               onClick={() => window.location.reload()} 
               className="mt-4 bg-blue-600 hover:bg-blue-700"
@@ -184,13 +242,13 @@ export default function ProfilePage() {
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" size="icon" className="rounded-md">
-                  <Settings className="h-4 w-4" />
-                  <span className="sr-only">Settings</span>
+                  <UserRoundPen className="h-4 w-4" />
+                  <span className="sr-only">Edit Profile</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle className="text-xl">Settings</DialogTitle>
+                  <DialogTitle className="text-xl">Edit Profile</DialogTitle>
                   <DialogDescription>
                     Manage your account settings and set e-mail preferences.
                   </DialogDescription>
@@ -198,82 +256,50 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-4 gap-6 py-4">
                   <div className="col-span-4 md:col-span-1">
                     <div className="space-y-2">
-                      <div className="font-medium text-sm text-blue-600 bg-blue-50 rounded-md p-2">Profile</div>
-                      <div className="font-medium text-sm text-gray-600 hover:text-blue-600 p-2">Account</div>
-                      <div className="font-medium text-sm text-gray-600 hover:text-blue-600 p-2">Appearance</div>
-                      <div className="font-medium text-sm text-gray-600 hover:text-blue-600 p-2">Notifications</div>
-                      <div className="font-medium text-sm text-gray-600 hover:text-blue-600 p-2">Display</div>
+                      <div 
+                        className={`font-medium text-sm p-2 cursor-pointer ${settingsTab === "profile" ? "text-blue-600 bg-blue-50 rounded-md" : "text-gray-600 hover:text-blue-600"}`}
+                        onClick={() => handleSettingsTabChange("profile")}
+                      >
+                        Profile
+                      </div>
+                      <div 
+                        className={`font-medium text-sm p-2 cursor-pointer ${settingsTab === "account" ? "text-blue-600 bg-blue-50 rounded-md" : "text-gray-600 hover:text-blue-600"}`}
+                        onClick={() => handleSettingsTabChange("account")}
+                      >
+                        Account
+                      </div>
                     </div>
                   </div>
                   <div className="col-span-4 md:col-span-3">
-                    <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-                      <div className="space-y-4">
+                    {settingsTab === "profile" && (
+                      <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
                         <div>
-                          <Label htmlFor="username">Username</Label>
-                          <Input 
-                            id="username" 
-                            value="shadcn" 
-                            className="mt-1"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            This is your public display name. It can be your real name or a pseudonym. You can only change this once every 30 days.
-                          </p>
+                          <h3 className="text-lg font-medium">Profile Information</h3>
+                          <p className="text-sm text-gray-500">Update your personal information.</p>
                         </div>
                         
-                        <div>
-                          <Label htmlFor="email">Email</Label>
-                          <Select defaultValue="email1">
-                            <SelectTrigger className="mt-1">
-                              <SelectValue placeholder="Select a verified email to display" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="email1">user@example.com</SelectItem>
-                              <SelectItem value="email2">alternate@example.com</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-gray-500 mt-1">
-                            You can manage verified email addresses in your email settings.
-                          </p>
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="bio">Bio</Label>
-                          <Textarea 
-                            id="bio" 
-                            placeholder="Tell us about yourself" 
-                            className="mt-1 resize-none" 
-                            defaultValue="I own a computer."
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            You can @mention other users and organizations to link to them.
-                          </p>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="firstName">First Name</Label>
-                            <Input 
-                              id="firstName" 
-                              value={editData.firstName} 
-                              onChange={(e) => handleInputChange("firstName", e.target.value)}
-                              className="mt-1"
-                            />
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="firstName">First Name</Label>
+                              <Input 
+                                id="firstName" 
+                                value={editData.firstName} 
+                                onChange={(e) => handleInputChange("firstName", e.target.value)}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="lastName">Last Name</Label>
+                              <Input 
+                                id="lastName" 
+                                value={editData.lastName} 
+                                onChange={(e) => handleInputChange("lastName", e.target.value)}
+                                className="mt-1"
+                              />
+                            </div>
                           </div>
-                          <div>
-                            <Label htmlFor="lastName">Last Name</Label>
-                            <Input 
-                              id="lastName" 
-                              value={editData.lastName} 
-                              onChange={(e) => handleInputChange("lastName", e.target.value)}
-                              className="mt-1"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
                           
-                          </div>
                           <div>
                             <Label htmlFor="city">City</Label>
                             <Input 
@@ -284,24 +310,103 @@ export default function ProfilePage() {
                             />
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" type="button" onClick={() => handleCancel()}>
-                          Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSaving}>
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            "Save changes"
-                          )}
-                        </Button>
-                      </div>
-                    </form>
+                        
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" type="button" onClick={() => handleCancel()}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={isSaving} className="hover:cursor-pointer">
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              "Save changes"
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                    
+                    {settingsTab === "account" && (
+                      <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
+                        <div>
+                          <h3 className="text-lg font-medium">Account Settings</h3>
+                          <p className="text-sm text-gray-500">Manage your account credentials.</p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="username">Username</Label>
+                            <Input 
+                              id="username" 
+                              value={editAuthData.username}
+                              onChange={(e) => setEditAuthData({...editAuthData, username: e.target.value})}
+                              className="mt-1"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              This is your public display name. You can only change this once every 30 days.
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="email">Email</Label>
+                            <Input 
+                              id="email" 
+                              type="email"
+                              value={editAuthData.email}
+                              onChange={(e) => setEditAuthData({...editAuthData, email: e.target.value})}
+                              className="mt-1"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              You can manage verified email addresses in your email settings.
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="password">Password</Label>
+                            <div className="relative mt-1">
+                              <Input 
+                                id="password" 
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                                value={editAuthData.password}
+                                onChange={(e) => setEditAuthData({...editAuthData, password: e.target.value})}
+                                className="pr-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                              >
+                                {showPassword ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Leave blank to keep your current password.
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex justify-end">
+                          <Button type="submit" className="bg-blue-600 hover:bg-blue-700 hover:cursor-pointer" disabled={isSaving}>
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Updating...
+                              </>
+                            ) : (
+                              "Update account"
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 </div>
               </DialogContent>
@@ -317,12 +422,26 @@ export default function ProfilePage() {
                     <Badge className="absolute top-2 left-2 bg-blue-600 hover:bg-blue-700">Pro</Badge>
                   </div>
                   <div className="pt-6 px-6 flex flex-col items-center">
-                    <Avatar className="h-24 w-24 border-4 border-white shadow-md">
-                      <AvatarImage src="/placeholder.svg" alt="Profile" />
-                      <AvatarFallback className="bg-blue-500 text-white text-xl font-semibold">
-                        {getInitials(profileData.firstName, profileData.lastName)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative group">
+                      <Avatar className="h-24 w-24 border-4 border-white shadow-md">
+                        <AvatarImage src={profileData.avatar || "/placeholder.svg"} alt="Profile" />
+                        <AvatarFallback className="bg-blue-500 text-white text-xl font-semibold">
+                          {getInitials(profileData.firstName, profileData.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      {/* Upload Button Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-400 bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <Camera className="h-6 w-6 text-white" />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarUpload}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          title="Upload avatar"
+                        />
+                      </div>
+                    </div>
                     <h2 className="text-xl font-bold mt-4">{profileData.firstName} {profileData.lastName}</h2>
                     <p className="text-gray-500 text-sm">Project Manager</p>
                   </div>

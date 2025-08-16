@@ -1,31 +1,12 @@
 import httpClient from "@/lib/apiClient";
 import { API } from "@/lib/config/configuration";
+import { ProfileUpdateRequest, ProfileResponse, ApiResponse } from "@/types";
 
-export interface ProfileUpdateRequest {
-    firstName: string;
-    lastName: string;
-    city: string;
-    dob: string;
-}
-
-export interface ProfileResponse {
-    id: string;
-    userId: string;
-    firstName: string;
-    lastName: string;
-    city: string;
-    dob: string;
-}
-
-interface ApiResponse {
-    code: number;
-    result: ProfileResponse;
-}
 
 const profileService = {
     getProfile: async (): Promise<ProfileResponse> => {
         try {
-            const response = await httpClient.get<ApiResponse>(`${API.PROFILE}/my-profile`);
+            const response = await httpClient.get<ApiResponse<ProfileResponse>>(`${API.PROFILE}/my-profile`);
             console.log('API Response:', response.data);
             
             if (!response.data || !response.data.result) {
@@ -41,7 +22,7 @@ const profileService = {
     
     updateProfile: async (request: ProfileUpdateRequest): Promise<ProfileResponse> => {
         try {
-            const response = await httpClient.put<ApiResponse>(`${API.PROFILE}/my-profile`, request);
+            const response = await httpClient.put<ApiResponse<ProfileResponse>>(`${API.PROFILE}/my-profile`, request);
             console.log('API Response:', response.data);
             
             if (!response.data || !response.data.result) {
@@ -53,7 +34,22 @@ const profileService = {
             console.error("Error in updating profile:", error);
             throw error;
         }
+    },
+    
+    updateProfileAvatar: async(avatar : FormData) => {
+        try { 
+           const response =  await httpClient.put<ApiResponse<ProfileResponse>>(`${API.UPDATE_PROFILE_AVATAR}`, avatar, {
+                headers : {
+                    'Content-Type': 'multipart/form-data'
+                }
+            })
+            return response.data.result;
+        } catch(error){
+            console.error("Error in updating profile avatar:", error);
+            throw error;
+        }
     }
+
 };
 
 export default profileService;

@@ -5,13 +5,13 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../../app/context/AuthContext"
 import { useState, useEffect } from "react"
-import { loginSchema } from "@/lib/validation"
+import { loginSchema } from "@/types"
 import { z } from "zod";
 import { toast } from "sonner"
 import { Loader2, AlertTriangle } from "lucide-react"
 
 export default function LoginModal() {
-  const { isLoginModalOpen, closeLoginModal, switchToRegister, login, loginError, isLoading, isLoggedIn, status } = useAuth();
+  const { isLoginModalOpen, closeLoginModal, switchToRegister, login, loginError, isLoading, isLoggedIn, status, hasJustLoggedIn, resetLoginState } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");                          
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -24,13 +24,13 @@ export default function LoginModal() {
     }
   }, [isLoginModalOpen]);
 
-  // Remove the error toast effect
-  // Show success toast when authentication succeeds
+  // Show success toast only when user has just logged in
   useEffect(() => {
-    if (isLoggedIn && status === 'authenticated' && !isLoginModalOpen) {
+    if (hasJustLoggedIn && isLoggedIn && status === 'authenticated' && !isLoginModalOpen) {
       toast.success('Logged in successfully!');
+      resetLoginState(); // Reset the flag after showing toast
     }
-  }, [isLoggedIn, status, isLoginModalOpen]);
+  }, [hasJustLoggedIn, isLoggedIn, status, isLoginModalOpen, resetLoginState]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

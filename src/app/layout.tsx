@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/navbar/navbar"
 import { Montserrat } from "next/font/google";
 import Footer from "@/components/footer/footer"
 import { AuthProvider } from "@/app/context/AuthContext";
+import { UserProfileProvider } from "@/app/context/UserProfileContext";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import Providers from "./providers";
@@ -22,19 +22,20 @@ export default function RootLayout({
       <body>
        <Providers>
           <AuthProvider>
-
-        <div >
-            <Navbar />
-            <main>
-              {children}
-            </main>
-            <Footer/>
-            <LoginModal/>
-            <RegisterModal/>
-            <ChatBot/>
-            <Toaster position="top-right" />
-        </div>
-        </AuthProvider>
+            <UserProfileProvider>
+              <div >
+                  <Navbar />
+                  <main>
+                    {children}
+                  </main>
+                  <Footer/>
+                  <LoginModal/>
+                  <RegisterModal/>
+                  <ChatBot/>
+                  <Toaster position="top-right" />
+              </div>
+            </UserProfileProvider>
+          </AuthProvider>
         </Providers>
        
       </body>

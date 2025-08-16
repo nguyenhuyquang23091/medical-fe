@@ -2,9 +2,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Session } from 'next-auth';
-import authService, {RegisterData} from '@/services/auth/auth';
-import { ERROR_MESSAGES } from '@/errors/errorCode';
-import axios from 'axios';
+import authService from '@/services/auth/auth';
+import { ERROR_MESSAGES } from '@/lib/errors/errorCode';
+import { RegisterData } from '@/types';
 
 // Shape of the context
 type AuthContextType = {
@@ -18,14 +18,19 @@ type AuthContextType = {
   switchToLogin: () => void;
   isLoggedIn: boolean;
   login: (identifier: string, password: string) => Promise<void>;
-  register: (data: RegisterData) => Promise<boolean>;
   logout: () => Promise<void>;
+  register: (data: RegisterData) => Promise<boolean>;
   session: Session | null;
   status: "loading" | "authenticated" | "unauthenticated";
   loginError: string | null;
   registerError: string | null;
+  logoutError: string | null;
   isLoading: boolean;
+  hasJustLoggedIn: boolean;
+  resetLoginState: () => void;
 };
+
+ 
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,7 +45,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasJustLoggedIn, setHasJustLoggedIn] = useState(false);
   
   const closeLoginModal = () => {
     setLoginError(null);
@@ -64,17 +71,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
       });
 
       if (result?.error) {
-        // The error here is already a user-friendly message from NextAuth
-        // It comes from the throw new Error() in the authorize function
-        setLoginError(result.error);
         console.error("Authentication error:", result.error);
+        // Map NextAuth's "Configuration" error to our custom message
+        if (result.error === "Configuration") {
+          setLoginError("We couldn't log you in. Double-check your email and password.");
+        } else {
+          setLoginError(result.error);
+        }
       } else {
+        setHasJustLoggedIn(true);
         closeLoginModal();
       }
     } catch (error) {
       console.error('Login error', error);
       // Use the generic error code for unexpected errors
       setLoginError(ERROR_MESSAGES[9999]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setIsLoading(true);
+      setLogoutError(null);
+      setHasJustLoggedIn(false); // Reset login state on logout
+      
+      // Call backend logout API first
+      if (session?.accessToken) {
+        await authService.signOut(session.accessToken);
+      }
+      
+      // Then clear NextAuth session
+      await signOut({ redirect: false });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Set error but still proceed with NextAuth signOut
+      if (error && typeof error === 'object' && 'code' in error) {
+        const errorCode = Number(error.code) || 9999;
+        setLogoutError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES[9999]);
+      } else {
+        setLogoutError('An error occurred during logout');
+      }
+      
+      // Still sign out from NextAuth even if backend call fails
+      try {
+        await signOut({ redirect: false });
+      } catch (nextAuthError) {
+        console.error('NextAuth signOut error:', nextAuthError);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -110,17 +155,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      await authService.logout();
-      await signOut({ redirect: false });
-    } catch (error) {
-      console.error("Error during logout", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const openLoginModal = () => {
     setLoginError(null);
@@ -147,6 +181,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsRegisterModalOpen(false);
     setIsLoginModalOpen(true);
   };
+
+  const resetLoginState = () => {
+    setHasJustLoggedIn(false);
+  };
   
   // Value for consumer
   const value = {
@@ -160,13 +198,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     switchToLogin,
     isLoggedIn: status === 'authenticated',
     login, 
-    register,
     logout,
+    register,
     session,
     status,
     loginError,
     registerError,
-    isLoading
+    logoutError,
+    isLoading,
+    hasJustLoggedIn,
+    resetLoginState
   };
 
   return (

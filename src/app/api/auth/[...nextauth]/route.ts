@@ -1,26 +1,27 @@
-import CredentialsProvider from "next-auth/providers/credentials";
+
 import httpClient from "@/lib/apiClient";
-import NextAuth, { AuthOptions } from "next-auth";
-import { ERROR_MESSAGES } from "@/errors/errorCode";
+import { ERROR_MESSAGES } from "@/lib/errors/errorCode";
 import axios from "axios";
 import { API } from "@/lib/config/configuration";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials"
 
 
-export const authOptions: AuthOptions = {
-    providers: [
-        CredentialsProvider({
-            name: "Credentials",
-            credentials: {
+export const {handlers, signIn, signOut, auth} = NextAuth({
+    providers : [
+        Credentials({
+             credentials: {
                 identifier: { label: "Email or Username", type: "text" },
                 password: { label: "Password", type: "password" }
-            },
-            async authorize(credentials, req) {
+            }, 
+            authorize : async ( credentials) =>{
                 try {
                     console.log("Attempting login with:", credentials?.identifier);
+                    const identifier = typeof credentials?.identifier === "string" ? credentials.identifier : '';
                     
                     const res = await httpClient.post(API.LOGIN, {
-                        email: credentials?.identifier?.includes('@') ? credentials.identifier : null,
-                        username: credentials?.identifier?.includes('@') ? null : credentials?.identifier,
+                        email : identifier.includes('@') ? identifier : null,
+                        username: identifier.includes('@') ? null : identifier,
                         password: credentials?.password
                     });
                     
@@ -38,16 +39,16 @@ export const authOptions: AuthOptions = {
                  throw new Error(ERROR_MESSAGES[1006]);
 
                 } catch (error) {
+                    console.error("Login error in authorize:", error);
                     if (axios.isAxiosError(error)){
                         const code = error.response?.data.code || 9999;
                         throw new Error(ERROR_MESSAGES[code]);
                     } else if (error instanceof Error){
                         throw error;
                     }
-                    console.error("error when login", error);
-                    throw error;
+                    throw new Error(ERROR_MESSAGES[9999]);
                 }
-            }
+            } 
         })
     ],
     session: {
@@ -64,17 +65,19 @@ export const authOptions: AuthOptions = {
         },
         async session({ session, token }) {
             console.log("Setting session with token data", token);
-            session.accessToken = token.accessToken;
+            session.accessToken = typeof token.accessToken === 'string' ? token.accessToken : undefined;
             return session;
         }
     },
-    secret: process.env.NEXTAUTH_SECRET ,
+    secret: process.env.AUTH_SECRET,
     pages: {
         signIn: '/',
-        error: '/',  // You can create a custom error page if needed
+        error: '/',  
     }
-};
+    
+})
+export const { GET, POST } = handlers
 
 
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST }; 
+
+

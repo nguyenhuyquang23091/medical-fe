@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import chatbotService, { ChatMessage } from '@/services/chatbot/chatBot';
+import chatbotService from '@/services/chatbot/chatBot';
+import { ChatMessage } from '@/types';
 import { Typewriter } from '@/components/ui/typewriter';
 
 export const ChatBot = () => {

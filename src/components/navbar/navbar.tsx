@@ -4,36 +4,72 @@ import { Button } from "@/components/ui/button"
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
+import { useRouter } from "next/navigation";
 
+import { ProfileDropdown } from "../ui/profile-dropdown";
 
 export default function Navbar(){
+    const router = useRouter();
+
+
     const [isSticky, setIsSticky] = useState(false);
-    const { openLoginModal, openRegisterModal, isLoggedIn} = useAuth()
+    const { openLoginModal, openRegisterModal, isLoggedIn, logout} = useAuth()
 
     useEffect(() => {
-        const handleScroll = () =>{
-            if(window.scrollY > 400){
+        // Do something on page load. EMPTY ARRAY at the end.
+        const handleScroll = () => {
+            if(typeof window !== 'undefined' && window.scrollY > 400){
                 setIsSticky(true);
             } else {
                 setIsSticky(false);
             }
         };
 
-        window.addEventListener('scroll', handleScroll);
-        return () => {
-            window.removeEventListener('scroll', handleScroll);
+        const onLoad = () => {
+            if (typeof window !== 'undefined') {
+                window.addEventListener('scroll', handleScroll);
+            }
         };
-    }, []);
+
+        onLoad();
+
+        return () => {
+            // Do something on page unmount.
+            const onUnmount = () => {
+                if (typeof window !== 'undefined') {
+                    window.removeEventListener('scroll', handleScroll);
+                }
+            };
+            onUnmount();
+        };
+    }, [])
 
     const navLinks = [
         { title: "Home", href: "/" },
-        { title: "Department", href: "/" },
+        { title: "Appointment", href: "/" },
         { title: "Blog", href: "/" },
         { title: "Page", href: "/" },
         { title: "Doctors", href: "/doctor" },
         { title: "Contact", href: "/" },
     ];
-  
+
+    const handleViewProfile = () =>{
+        router.push("/profile");
+    }
+    
+    const handleSettings = () => {
+
+    }
+    
+    const handleLogout = async () => {
+        try {
+            await logout();
+            router.push('/'); // Redirect to home page after logout
+        } catch (error) {
+            console.error('Logout failed:', error);
+            // The error is already handled in AuthContext
+        }
+    }
           
     return (
         <>
@@ -75,6 +111,11 @@ export default function Navbar(){
                             <Button asChild className="bg-blue-400 hover:bg-blue-500">
                             <Link href="/appointment" className="flex items-center"> Making an Appointment</Link>
                         </Button>
+                    <ProfileDropdown
+                        onViewProfile={handleViewProfile}
+                        onSettings={handleSettings}
+                        onLogout={handleLogout}
+                    />
                         </>
                     ) : (
                         <>
@@ -86,7 +127,6 @@ export default function Navbar(){
                             >
                                 Login
                             </Button>
-
                             <Button
                             variant="outline"
                             onClick={openRegisterModal}
@@ -94,7 +134,6 @@ export default function Navbar(){
                             >
                                 Register
                             </Button>
-
 
                         </>
 

@@ -1,25 +1,6 @@
 import httpClient from "@/lib/apiClient";
 import { API } from "@/lib/config/configuration";
-
-// Match BE DTO structure exactly
-export interface ChatbotRequest {
-    content: string;
-    conversationId?: string | null;
-}
-
-// Backend API response structure
-interface ApiResponse {
-    code: number;
-    result: {
-        assistantMessage: string;
-        conversationId: string;
-    }
-}
-
-export interface ChatMessage {
-    content: string;
-    isBot: boolean;
-}
+import { ChatbotRequest, ChatMessage, ChatbotApiResponse } from "@/types";
 
 const CONVERSATION_ID_KEY = "chatbot_conversation_id";
 
@@ -30,7 +11,7 @@ const chatbotService = {
     },
 
     // Main ask function
-    ask: async (content: string): Promise<ApiResponse> => {
+    ask: async (content: string): Promise<ChatbotApiResponse> => {
         try {
             // Get existing conversation ID if available
             const conversationId = chatbotService.getConversationId();
@@ -43,7 +24,7 @@ const chatbotService = {
 
             console.log('Sending request to chatbot API:', request);
             // Make API call and return an ApiResponse similar to BE
-            const response = await httpClient.post<ApiResponse>(API.CHATBOT, request);
+            const response = await httpClient.post<ChatbotApiResponse>(API.CHATBOT, request);
             console.log('API Response:', response.data);
           
          
@@ -61,13 +42,7 @@ const chatbotService = {
                 localStorage.setItem(CONVERSATION_ID_KEY, result.conversationId);
             }
 
-            return {
-                code: response.data.code,
-                result: {
-                    assistantMessage : result.assistantMessage,
-                    conversationId : result.conversationId
-                }
-            };
+            return response.data;
         } catch (error) {
             console.error("Error in chatbot communication:", error);
             throw error;

@@ -359,8 +359,7 @@ export default function Doctors() {
                                                 rounded-full px-6 mx-3
                                                 text-md font-normal
                                                border border-white
-                                                cursor-pointer
-                                                
+                                                cursor-pointer   
                                                "
                                         >
                                             Make An Appointment
