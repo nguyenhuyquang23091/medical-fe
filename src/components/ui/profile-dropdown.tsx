@@ -9,24 +9,36 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { User, Settings, LogOut } from "lucide-react"
+import { User, Settings, LogOut, CalendarCheck  } from "lucide-react"
 import { ProfileDropdownProps } from "@/types"
 import { useUserProfile } from "@/app/context/UserProfileContext"
+import { useState, useEffect } from "react"
 export function ProfileDropdown({
     onViewProfile,
-    onSettings, 
+    onSettings,
+    onAppointments, 
     onLogout
 }: Omit<ProfileDropdownProps, 'user'>) {
     const { userProfile, authData } = useUserProfile();
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
     
    const user = {
-       name: userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : "Loading...",
-       email: authData?.email || "loading@example.com",
+       name: userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : "",
+       email: authData?.email || "",
        avatar: userProfile?.avatar || "/placeholder.svg"
    };
 
-    const initials = userProfile ? 
+    const initials = userProfile?.firstName && userProfile?.lastName ? 
         `${userProfile.firstName[0]}${userProfile.lastName[0]}`.toUpperCase() : "L";
+    
+    if (!isMounted) {
+        return null;
+    }
+
 return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -45,10 +57,10 @@ return (
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : "Loading..."}
+              {userProfile ? `${userProfile.firstName} ${userProfile.lastName}` : ""}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
-              {authData?.email || "loading@example.com"}
+              {authData?.email || ""}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -58,11 +70,15 @@ return (
           className="cursor-pointer focus:bg-accent focus:text-accent-foreground"
         >
           <User className="mr-2 h-4 w-4" />
-          <span>View Profile</span>
+          <span>My Account</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onSettings} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onAppointments} className="cursor-pointer focus:bg-accent focus:text-accent-foreground">
+          <CalendarCheck className="mr-2 h-4 w-4" />
+          <span> My Appointments </span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

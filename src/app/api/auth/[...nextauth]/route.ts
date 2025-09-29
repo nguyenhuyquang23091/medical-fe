@@ -1,11 +1,41 @@
 
-import httpClient from "@/lib/apiClient";
+import axios from 'axios';
+import { API_GATEWAY_URL, API } from '@/lib/config/configuration';
 import { ERROR_MESSAGES } from "@/lib/errors/errorCode";
-import axios from "axios";
-import { API } from "@/lib/config/configuration";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials"
 
+// Refresh token function
+async function refreshAccessToken(token: any) {
+    try {
+        console.log("Refreshing access token...");
+            
+        const response = await axios.post(`${API_GATEWAY_URL.BASE_URL}${API.REFRESH}`, {
+            token: token.refreshToken
+        });
+
+        const refreshedTokens = response.data?.result;
+
+        if (!refreshedTokens?.accessToken) {
+            throw new Error("No access token in refresh response");
+        }
+
+        console.log("Token refresh successful");    
+        return {
+            ...token,
+            accessToken: refreshedTokens.accessToken,
+            // if the refresh value is null or undefined, fall back to use the old refresh token
+            refreshToken: refreshedTokens.refreshToken ?? token.refreshToken,
+            accessTokenExpires: refreshedTokens.accessTokenExpires // Backend provides milliseconds
+        }
+    } catch (error) {
+        console.error("Error refreshing access token:", error);
+        return {
+            ...token,
+            error: "RefreshAccessTokenError",
+        }
+    }
+}
 
 export const {handlers, signIn, signOut, auth} = NextAuth({
     providers : [
@@ -19,25 +49,26 @@ export const {handlers, signIn, signOut, auth} = NextAuth({
                     console.log("Attempting login with:", credentials?.identifier);
                     const identifier = typeof credentials?.identifier === "string" ? credentials.identifier : '';
                     
-                    const res = await httpClient.post(API.LOGIN, {
+                    const res = await axios.post(`${API_GATEWAY_URL.BASE_URL}${API.LOGIN}`, {
                         email : identifier.includes('@') ? identifier : null,
                         username: identifier.includes('@') ? null : identifier,
                         password: credentials?.password
                     });
-                    
+                
                     console.log("Login response:", res.data);
                     const result = res.data?.result;
 
-                    if (result?.token) {
+                    if (result?.accessToken) {
                         return {
-                            id: result?.userId || "placeholder",
-                            accessToken: result.token,
+                            accessToken: result.accessToken,
+                            refreshToken : result.refreshToken,
                             authenticated: result.authenticated,
+                            role: result.role,
+                            accessTokenExpires: result.accessTokenExpires, // Backend provides timestamp
                         };
                     }
                 
                  throw new Error(ERROR_MESSAGES[1006]);
-
                 } catch (error) {
                     console.error("Login error in authorize:", error);
                     if (axios.isAxiosError(error)){
@@ -51,28 +82,51 @@ export const {handlers, signIn, signOut, auth} = NextAuth({
             } 
         })
     ],
-    session: {
-        strategy: "jwt",
-        maxAge: 30 * 24 * 60 * 60, // 30 days
-    },
     callbacks: {
-        async jwt({ token, user }) {
-            if (user) {
-                console.log("Setting JWT token with user data", user);
-                token.accessToken = user.accessToken;
+        async jwt({ token, user, account }) {
+
+            // Initial sign in
+            if (account && user) {
+                console.log("Initial JWT setup with user data", user);
+                return {
+                    ...token,
+                    accessToken: user.accessToken,
+                    refreshToken: user.refreshToken,
+                    role: user.role,
+                    authenticated: user.authenticated,
+                    accessTokenExpires: user.accessTokenExpires 
+                }
             }
-            return token;
+
+            // Return previous token if the access token has not expired yet
+            const now = Date.now();
+            const expiresAt = token.accessTokenExpires as number
+           
+            if (now < expiresAt) {
+                console.log("Token still valid, returning existing token");
+                return token;
+            }
+
+            // Access token has expired, try to refresh it
+            console.log("Token expired, attempting refresh");
+            return refreshAccessToken(token);
         },
+
+        //transform session-cookie data -> session object
         async session({ session, token }) {
             console.log("Setting session with token data", token);
+
             session.accessToken = typeof token.accessToken === 'string' ? token.accessToken : undefined;
+            session.refreshToken = typeof token.refreshToken === 'string' ? token.refreshToken : undefined;
+            session.user.role = typeof token.role === 'string' ? token.role : undefined;
+
             return session;
         }
     },
     secret: process.env.AUTH_SECRET,
     pages: {
         signIn: '/',
-        error: '/',  
+        error: '/',
     }
     
 })

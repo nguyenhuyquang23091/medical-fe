@@ -1,8 +1,8 @@
 "use client"
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Session } from 'next-auth';
-import authService from '@/services/auth/auth';
+import authService from '@/actions/auth/auth';
 import { ERROR_MESSAGES } from '@/lib/errors/errorCode';
 import { RegisterData } from '@/types';
 
@@ -29,8 +29,6 @@ type AuthContextType = {
   hasJustLoggedIn: boolean;
   resetLoginState: () => void;
 };
-
- 
 
 // Create the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -81,6 +79,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         setHasJustLoggedIn(true);
         closeLoginModal();
+
+        // Role-based redirect after successful login
+        setTimeout(() => {
+          // Get the updated session to access role
+          window.location.reload(); // This will trigger middleware with new session
+        }, 100);
       }
     } catch (error) {
       console.error('Login error', error);
@@ -96,12 +100,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsLoading(true);
       setLogoutError(null);
       setHasJustLoggedIn(false); // Reset login state on logout
-      
+
+
       // Call backend logout API first
       if (session?.accessToken) {
-        await authService.signOut(session.accessToken);
+        await authService.signOut();
       }
-      
+
       // Then clear NextAuth session
       await signOut({ redirect: false });
     } catch (error) {
@@ -113,7 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } else {
         setLogoutError('An error occurred during logout');
       }
-      
+
       // Still sign out from NextAuth even if backend call fails
       try {
         await signOut({ redirect: false });
@@ -197,7 +202,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     switchToRegister,
     switchToLogin,
     isLoggedIn: status === 'authenticated',
-    login, 
+    login,
     logout,
     register,
     session,

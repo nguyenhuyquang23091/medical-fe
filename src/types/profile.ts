@@ -1,18 +1,10 @@
-// Profile-related types and interfaces
+import {BaseProfile} from "./baseProfile";
 
-export interface ProfileUpdateRequest {
-  firstName: string;
-  lastName: string;
-  city: string;
-  dob: string;
+export interface ProfileUpdateRequest extends BaseProfile {
+  
+
 }
 
-export interface ProfileResponse {
-  id: string;
-  userId: string;
-  firstName: string;
-  avatar: string;
-  lastName: string;
-  city: string;
-  dob: string;
+export interface ProfileResponse extends BaseProfile {
+
 }

@@ -18,3 +18,9 @@ export * from './validation';
 
 // UI component types
 export * from './ui';
+
+// Patient types
+export * from './patient';
+
+// Prescription types
+export * from './prescription';

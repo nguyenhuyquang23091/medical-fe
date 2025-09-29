@@ -1,10 +1,14 @@
 "use client"
-import React, { createContext, useContext, useState, ReactNode, useEffect, use } from 'react';
-import profileService from '@/services/profile/profile';
-import authService from '@/services/auth/auth';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { profileClient } from '@/services/client/profileClient';
 import { ERROR_MESSAGES } from '@/lib/errors/errorCode';
 import { ProfileResponse, IdentityResponse, ProfileUpdateRequest, AuthDataUpdateRequest } from '@/types';
 import { useSession } from 'next-auth/react';
+import {
+  updateProfileAction,
+  updateAuthAction,
+  updateAvatarAction
+} from '@/actions/profile/profileActions';
 
 type UserProfileContextType = {
   // Profile data
@@ -37,26 +41,24 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
   const [authData, setAuthData] = useState<IdentityResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [userProfileError, setUserProfileError] = useState<string | null>(null);
-    const [avatarUrl, setAvatarUrl] = useState<string>("")
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const { data: session, status } = useSession();
-
-
+  const { status } = useSession();
 
   const fetchUserProfile = async () => {
-    
-      try {
+    try {
       setIsLoading(true);
       setUserProfileError(null);
-      
+
+      console.log('🔄 Making API call');
+
       const [profileResult, authResult] = await Promise.all([
-        profileService.getProfile(),
-        authService.getInfo()
+        profileClient.getProfile(),
+        profileClient.getAuthInfo()
       ]);
-      
-      console.log('Fetched Profile:', profileResult);
-      console.log('Fetched Auth Data:', authResult);
-      
+
+      console.log('Fetched Profile from API:', profileResult);
+      console.log('Fetched Auth Data from API:', authResult);
+
       setUserProfile(profileResult);
       setAuthData(authResult);
     } catch (error) {
@@ -80,7 +82,11 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     try {
         setIsLoading(true);
         setUserProfileError(null);
-        await profileService.updateProfile(updateRequest);
+
+        // Use server action to update
+        await updateProfileAction(updateRequest);
+
+        // Fetch fresh data
         await fetchUserProfile();
 
     } catch (error) {
@@ -97,16 +103,16 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
   }
 
   const updateAvatar = async (file: File) => {
-    
-    try { 
-    setIsUploadingAvatar(true);
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await profileService.updateProfileAvatar(formData);
+    try {
+      setIsUploadingAvatar(true);
+      const formData = new FormData();
+      formData.append('file', file);
 
-    const imageUrl = response.avatar;
-    setAvatarUrl(imageUrl);
+      // Use server action to update avatar
+      await updateAvatarAction(formData);
+
+      // Fetch fresh data
+      await fetchUserProfile();
 
     } catch( error){
       console.error("Error in updating profile avatar:", error);
@@ -114,14 +120,17 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     } finally{
       setIsUploadingAvatar(false);
     }
-
   }
 
   const updateAuthCredential = async (authUpdateRequest: AuthDataUpdateRequest) => {
     try {
         setIsLoading(true);
         setUserProfileError(null);
-        await authService.updateInfo(authUpdateRequest);
+
+        // Use server action to update auth
+        await updateAuthAction(authUpdateRequest);
+
+        // Fetch fresh data
         await fetchUserProfile();
     } catch (error) {
         console.error('Error updating auth credentials:', error);
@@ -139,11 +148,13 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
   }
 
 
-
-  // Only fetching user based on its status is authenticated 
+  // Only fetching user based on its status is authenticated
   useEffect(() => {
     if (status === "authenticated") {
       fetchUserProfile();
+    } else if (status === "unauthenticated") {
+      setUserProfile(null);
+      setAuthData(null);
     }
   }, [status]);
 

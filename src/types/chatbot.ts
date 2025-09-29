@@ -1,7 +1,7 @@
 // Chatbot-related types and interfaces
 
 export interface ChatbotRequest {
-  content: string;
+  message: string;
   conversationId?: string | null;
 }
 
@@ -12,9 +12,6 @@ export interface ChatMessage {
 
 // Chatbot-specific API response structure
 export interface ChatbotApiResponse {
-  code: number;
-  result: {
-    assistantMessage: string;
-    conversationId: string;
-  };
+  content: string;
+  conversationId: string;
 }

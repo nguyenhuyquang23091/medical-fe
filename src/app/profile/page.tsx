@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MapPin, Mail, Phone, Loader2, Globe, UserRoundPen, Camera, Eye, EyeOff } from "lucide-react"
+import { ProfilePageSkeleton } from "@/components/ui/profile-loading-skeleton"
 import { ProfileUpdateRequest, AuthDataUpdateRequest } from "@/types"
 import { useUserProfile } from "@/app/context/UserProfileContext"
 import { useSession } from "next-auth/react"
@@ -25,8 +26,8 @@ import {
 
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession()
-  const { userProfile: profileData, authData, isLoading: contextLoading, userProfileError, updateUserProfile, updateAuthCredential, updateAvatar } = useUserProfile()
+  const { status } = useSession()
+  const { userProfile: profileData, authData, userProfileError, updateUserProfile, updateAuthCredential, updateAvatar } = useUserProfile()
   const [isSaving, setIsSaving] = useState(false)
   const [editData, setEditData] = useState<ProfileUpdateRequest>({
     firstName: "",
@@ -71,7 +72,7 @@ export default function ProfilePage() {
   const handleSave = async () => {
     try {
       setIsSaving(true)
-      
+    
       // Determine which tab is active to know what to update
       if (settingsTab === "profile") {
         // Validate profile data
@@ -167,14 +168,7 @@ export default function ProfilePage() {
 
   // Handle authentication states
   if (status === "loading") {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-gray-600">Checking authentication...</p>
-        </div>
-      </div>
-    )
+    return <ProfilePageSkeleton />
   }
 
   if (status === "unauthenticated") {
@@ -220,11 +214,7 @@ export default function ProfilePage() {
   }
 
   if (!profileData) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p>No profile data available.</p>
-      </div>
-    )
+    return <ProfilePageSkeleton />
   }
 
   return (
@@ -234,9 +224,7 @@ export default function ProfilePage() {
           <div className="flex justify-between items-center mb-6">
             <TabsList className="bg-white border">
               <TabsTrigger value="overview" className="data-[state=active]:bg-blue-50">Overview</TabsTrigger>
-              <TabsTrigger value="projects" className="data-[state=active]:bg-blue-50">Projects</TabsTrigger>
-              <TabsTrigger value="activities" className="data-[state=active]:bg-blue-50">Activities</TabsTrigger>
-              <TabsTrigger value="members" className="data-[state=active]:bg-blue-50">Members</TabsTrigger>
+              <TabsTrigger value="projects" className="data-[state=active]:bg-blue-50">Prescriptions</TabsTrigger>
             </TabsList>
             
             <Dialog>

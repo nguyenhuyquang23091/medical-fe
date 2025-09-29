@@ -4,7 +4,7 @@ import { ExtendedSession, ExtendedUser, AuthError, ExtendedJWT, CustomApiError }
 //config file to declare variable types
 declare module "next-auth" {
     interface Session extends ExtendedSession {
-        accessToken ? : string
+     
     }
 
     interface User extends ExtendedUser {}
@@ -15,6 +15,6 @@ declare module "next-auth" {
 
 declare module "next-auth/jwt" {
     interface JWT extends ExtendedJWT {
-        accessToken?: string;
+
     }
 } 

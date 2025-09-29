@@ -9,6 +9,7 @@ export interface ProfileDropdownProps {
   onViewProfile?: () => void;
   onSettings?: () => void;
   onLogout?: () => void;
+  onAppointments?: () => void;
 }
 
 // AuthContext types for UI state management

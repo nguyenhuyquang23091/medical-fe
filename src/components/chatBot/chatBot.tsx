@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import chatbotService from '@/services/chatbot/chatBot';
+import chatbotService from '@/actions/chatbot/chatBot';
 import { ChatMessage } from '@/types';
 import { Typewriter } from '@/components/ui/typewriter';
 
@@ -45,7 +45,6 @@ export const ChatBot = () => {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading) return;
-
     try {
       setIsLoading(true);
       
@@ -62,7 +61,7 @@ export const ChatBot = () => {
       
       // Add bot response
       const botMessage: ChatMessage = {
-        content: response.result.assistantMessage,
+        content: response.content,
         isBot: true,
       };
       setMessages(prev => [...prev, botMessage]);

@@ -141,3 +141,8 @@
     animation: slideDown 0.3s ease-out;
 }
 
+/* Ensure sidebar content starts below sticky navbar */
+.sidebar-with-navbar {
+    padding-top: 4rem;
+}
+

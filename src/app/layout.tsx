@@ -1,14 +1,14 @@
 import "./globals.css";
-import Navbar from "@/components/navbar/navbar"
+import ConditionalNavbar from "@/components/layout/ConditionalNavbar"
+import ConditionalFooter from "@/components/layout/ConditionalFooter"
+import ConditionalChatBot from "@/components/layout/ConditionalChatBot"
 import { Montserrat } from "next/font/google";
-import Footer from "@/components/footer/footer"
 import { AuthProvider } from "@/app/context/AuthContext";
-import { UserProfileProvider } from "@/app/context/UserProfileContext";
+import { AuthenticatedApp } from "@/components/app/AuthenticatedApp";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
 import Providers from "./providers";
 import { Toaster } from "@/components/ui/sonner";
-import ChatBot from "@/components/chatBot/chatBot";
 
 
 const montserrat = Montserrat({subsets:['latin']})
@@ -22,22 +22,22 @@ export default function RootLayout({
       <body>
        <Providers>
           <AuthProvider>
-            <UserProfileProvider>
-              <div >
-                  <Navbar />
-                  <main>
-                    {children}
-                  </main>
-                  <Footer/>
-                  <LoginModal/>
-                  <RegisterModal/>
-                  <ChatBot/>
-                  <Toaster position="top-right" />
+            <AuthenticatedApp>
+              <div>
+                <ConditionalNavbar />
+                <main>
+                  {children}
+                </main>
+                <ConditionalFooter/>
+                <LoginModal/>
+                <RegisterModal/>
+                <ConditionalChatBot/>
+                <Toaster position="top-right" />
               </div>
-            </UserProfileProvider>
+            </AuthenticatedApp>
           </AuthProvider>
         </Providers>
-       
+
       </body>
     </html>
   )

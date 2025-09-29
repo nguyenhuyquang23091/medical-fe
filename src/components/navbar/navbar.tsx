@@ -5,15 +5,16 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/app/context/AuthContext";
 import { useRouter } from "next/navigation";
-
+import { useNavbarProfile } from "@/hooks/useNavbarProfile";
 import { ProfileDropdown } from "../ui/profile-dropdown";
+import { NavbarLoadingSkeleton } from "../ui/profile-loading-skeleton";
 
 export default function Navbar(){
     const router = useRouter();
 
-
     const [isSticky, setIsSticky] = useState(false);
-    const { openLoginModal, openRegisterModal, isLoggedIn, logout} = useAuth()
+    const { openLoginModal, openRegisterModal, isLoggedIn, logout, status } = useAuth();
+    const { profile, isLoading: profileLoading } = useNavbarProfile();
 
     useEffect(() => {
         // Do something on page load. EMPTY ARRAY at the end.
@@ -46,7 +47,6 @@ export default function Navbar(){
 
     const navLinks = [
         { title: "Home", href: "/" },
-        { title: "Appointment", href: "/" },
         { title: "Blog", href: "/" },
         { title: "Page", href: "/" },
         { title: "Doctors", href: "/doctor" },
@@ -56,11 +56,14 @@ export default function Navbar(){
     const handleViewProfile = () =>{
         router.push("/profile");
     }
-    
+    const handleViewAppointments = () => {
+        router.push("/appointments");
+    }
+
     const handleSettings = () => {
 
     }
-    
+
     const handleLogout = async () => {
         try {
             await logout();
@@ -70,18 +73,18 @@ export default function Navbar(){
             // The error is already handled in AuthContext
         }
     }
-          
+
     return (
         <>
         <nav className={`bg-white transition-all duration-300 ${
-            isSticky 
-            ? 'fixed top-0 left-0 w-full shadow-md z-50 animate-slideDown ' 
+            isSticky
+            ? 'fixed top-0 left-0 w-full shadow-md z-50 animate-slideDown '
             : ''
         }`}>
             <div className=" max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center space-x-0.5">
-                        <Image 
+                        <Image
                             src="/images/logo2.jpg"
                             alt="MedConnect Logo"
                             width={70}
@@ -106,7 +109,9 @@ export default function Navbar(){
                         </div>
                     </div>
                     <div className="flex items-center space-x-4">
-                    {isLoggedIn ? (
+                    {status === 'loading' || (isLoggedIn && profileLoading) ? (
+                        <NavbarLoadingSkeleton />
+                    ) : isLoggedIn ? (
                         <>
                             <Button asChild className="bg-blue-400 hover:bg-blue-500">
                             <Link href="/appointment" className="flex items-center"> Making an Appointment</Link>
@@ -114,6 +119,7 @@ export default function Navbar(){
                     <ProfileDropdown
                         onViewProfile={handleViewProfile}
                         onSettings={handleSettings}
+                        onAppointments={handleViewAppointments}
                         onLogout={handleLogout}
                     />
                         </>
@@ -123,7 +129,7 @@ export default function Navbar(){
                             variant="ghost"
                             onClick={openLoginModal}
                             className="text-stone-500 hover:text-gray-600 hover:cursor-pointer"
-                        
+
                             >
                                 Login
                             </Button>
@@ -146,7 +152,6 @@ export default function Navbar(){
         </nav>
         </>
     )
-
 }
 
 
