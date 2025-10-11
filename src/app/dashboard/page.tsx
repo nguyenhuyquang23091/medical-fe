@@ -29,6 +29,7 @@ import {
 import { useSession } from "next-auth/react"
 import { useUserProfile } from "@/app/context/UserProfileContext"
 import { ProfilePageSkeleton } from "@/components/ui/profile-loading-skeleton"
+import { useRouter } from "next/navigation"
 
 const bloodSugarDataSets = {
   "Past 7 Days": [
@@ -95,6 +96,7 @@ const latestResults = [
 ]
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { status } = useSession()
   const { userProfile } = useUserProfile()
   const [bloodSugarPeriod, setBloodSugarPeriod] = useState("Past 7 Days")
@@ -298,9 +300,7 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-end mt-4">
-                <Button className="bg-blue-500 hover:bg-blue-600 text-white">See Insights</Button>
-              </div>
+              
             </CardContent>
           </Card>
 
@@ -309,9 +309,13 @@ export default function DashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div className="flex items-center space-x-2">
                 <FileText className="w-5 h-5 text-gray-600" />
-                <CardTitle className="text-xl font-semibold">Latest results</CardTitle>
+                <CardTitle className="text-xl font-semibold">Latest Prescriptions</CardTitle>
               </div>
-              <Button variant="ghost" className="text-blue-500 hover:text-blue-600 text-sm">
+              <Button
+                variant="ghost"
+                className="text-blue-500 hover:text-blue-600 text-sm"
+                onClick={() => router.push("/dashboard/prescriptions")}
+              >
                 See all
               </Button>
             </CardHeader>

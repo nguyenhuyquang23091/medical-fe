@@ -1,10 +1,7 @@
 import axios from 'axios';
 import { API_GATEWAY_URL, PUBLIC_ENDPOINT } from './config/configuration';
 
-/**
- * Server-side API client for server actions
- * No interceptors - direct token passing for server-side operations
- */
+
 export const createServerApiClient = (token: string) => {
     const client = axios.create({
         baseURL: API_GATEWAY_URL.BASE_URL,
@@ -20,6 +17,11 @@ export const createServerApiClient = (token: string) => {
         if (config.url && PUBLIC_ENDPOINT.has(config.url)) {
             delete config.headers.Authorization;
         }
+
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
+
         return config;
     }, (error) => {
         return Promise.reject(error);

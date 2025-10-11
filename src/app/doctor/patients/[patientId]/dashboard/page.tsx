@@ -31,6 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useAuth } from "@/app/context/AuthContext"
+import patientService from "@/actions/patient/patientActions"
+import { Patient } from "@/types"
+import { toast } from "sonner"
 
 const bloodSugarDataSets = {
   "Past 7 Days": [
@@ -201,18 +205,55 @@ const patientProfiles = {
 export default function PatientDashboardPage() {
   const params = useParams()
   const router = useRouter()
+  const { session } = useAuth()
   const [bloodSugarPeriod, setBloodSugarPeriod] = useState("Past 7 Days")
   const [currentData, setCurrentData] = useState(bloodSugarDataSets["Past 7 Days"])
-  const [isLoading, setIsLoading] = useState(false)
-  const [patientProfile, setPatientProfile] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [patientProfile, setPatientProfile] = useState<Patient | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load patient profile
-    const profile = patientProfiles[params.patientId as keyof typeof patientProfiles]
-    if (profile) {
-      setPatientProfile(profile)
+    // Load real patient profile from API
+    const loadPatientData = async () => {
+      if (!session?.accessToken || !params.patientId) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        setIsLoading(true)
+        setError(null)
+
+        console.log('Loading patient data for ID:', params.patientId)
+        const patient = await patientService.getPatientById(
+          params.patientId as string,
+          session.accessToken
+        )
+
+        console.log('Patient data loaded:', patient)
+        setPatientProfile(patient)
+      } catch (error: any) {
+        console.error('Failed to load patient data:', error)
+
+        if (error?.response?.status === 403 || error?.response?.status === 401) {
+          setError('Access denied. You need approved access to view this patient.')
+          toast.error('Access Denied', {
+            description: 'You do not have permission to view this patient data.',
+          })
+          // Redirect back to prescriptions page
+          setTimeout(() => {
+            router.push(`/doctor/patients/${params.patientId}/prescriptions`)
+          }, 2000)
+        } else {
+          setError('Failed to load patient data.')
+        }
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }, [params.patientId])
+
+    loadPatientData()
+  }, [params.patientId, session?.accessToken])
 
   useEffect(() => {
     setIsLoading(true)
@@ -237,7 +278,7 @@ export default function PatientDashboardPage() {
     router.push(`/doctor/patients/${params.patientId}/prescriptions`)
   }
 
-  if (!patientProfile) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-pulse">
@@ -247,6 +288,21 @@ export default function PatientDashboardPage() {
               <div key={i} className="h-24 bg-gray-200 rounded w-96"></div>
             ))}
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !patientProfile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            {error || 'Patient not found'}
+          </h1>
+          <Button onClick={() => router.push(`/doctor/patients/${params.patientId}/prescriptions`)}>
+            Back to Prescriptions
+          </Button>
         </div>
       </div>
     )
@@ -299,9 +355,9 @@ export default function PatientDashboardPage() {
                 {/* Patient Avatar */}
                 <div className="flex-shrink-0">
                   <Avatar className="h-20 w-20">
-                    <AvatarImage src="/images/patient-placeholder.jpg" />
+                    <AvatarImage src={patientProfile.avatar || "/images/patient-placeholder.jpg"} />
                     <AvatarFallback className="text-lg">
-                      {patientProfile.firstName.split(' ').map((n: string) => n[0]).join('')}{patientProfile.lastName.split(' ').map((n: string) => n[0]).join('')}
+                      {patientProfile.firstName[0]}{patientProfile.lastName[0]}
                     </AvatarFallback>
                   </Avatar>
                 </div>
@@ -315,17 +371,17 @@ export default function PatientDashboardPage() {
                         <h2 className="text-xl font-bold">{patientProfile.firstName} {patientProfile.lastName}</h2>
                         <Star className="h-4 w-4 text-yellow-500 fill-current" />
                       </div>
-                      <p className="text-sm text-muted-foreground">{patientProfile.id}</p>
+                      <p className="text-sm text-muted-foreground">ID: {patientProfile.id}</p>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span>{patientProfile.phone}</span>
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span>User ID: {patientProfile.userId}</span>
                       </div>
                       <div className="flex items-start gap-2 text-sm">
                         <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                        <span>{patientProfile.address}</span>
+                        <span>{patientProfile.city || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
@@ -333,39 +389,20 @@ export default function PatientDashboardPage() {
                   {/* Middle Column */}
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-2">Eligibility</h3>
-                      <Badge className={
-                        patientProfile.eligibility === 'Eligible'
-                          ? 'bg-green-100 text-green-800 border-green-200'
-                          : 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                      }>
-                        {patientProfile.eligibility}
+                      <h3 className="text-sm font-medium text-muted-foreground mb-2">Role</h3>
+                      <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                        {patientProfile.role}
                       </Badge>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">PCP</h3>
-                      <p className="text-sm">{patientProfile.pcp}</p>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Date of Birth</h3>
+                      <p className="text-sm">{patientProfile.dob || 'N/A'}</p>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-2">Acuity Risk Level</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">Clinical</span>
-                        <Badge className={
-                          patientProfile.acuityRiskLevel === 'Low'
-                            ? 'bg-green-100 text-green-800 border-green-200'
-                            : patientProfile.acuityRiskLevel === 'Moderate'
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                            : 'bg-red-100 text-red-800 border-red-200'
-                        }>
-                          {patientProfile.acuityRiskLevel}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">CDA</span>
-                        <Badge className="bg-red-100 text-red-800 border-red-200">
-                          High
-                        </Badge>
-                      </div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">City</h3>
+                      <p className="text-sm">{patientProfile.city || 'N/A'}</p>
                     </div>
                   </div>
 
@@ -373,22 +410,24 @@ export default function PatientDashboardPage() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-50 rounded-lg">
-                        <Shield className="h-5 w-5 text-blue-600" />
+                        <User className="h-5 w-5 text-blue-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">SafeLife</p>
-                        <p className="text-xs text-muted-foreground">Insurance</p>
+                        <p className="text-sm font-medium">Patient Profile</p>
+                        <p className="text-xs text-muted-foreground">Healthcare System</p>
                       </div>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Subscriber ID</h3>
-                      <p className="text-sm">{patientProfile.subscriberId}</p>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Profile ID</h3>
+                      <p className="text-sm">{patientProfile.id}</p>
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Practice</h3>
-                      <p className="text-sm">{patientProfile.practice}</p>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Access Status</h3>
+                      <Badge className="bg-green-100 text-green-800 border-green-200">
+                        ✓ Access Granted
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -513,7 +552,7 @@ export default function PatientDashboardPage() {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div className="flex items-center space-x-2">
                 <FileText className="w-5 h-5 text-gray-600" />
-                <CardTitle className="text-xl font-semibold">Latest results</CardTitle>
+                <CardTitle className="text-xl font-semibold">Latest Prescriptions</CardTitle>
               </div>
               <Button variant="ghost" className="text-blue-500 hover:text-blue-600 text-sm">
                 See all

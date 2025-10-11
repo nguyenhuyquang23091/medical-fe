@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { initSocketIo, subscribeToNotifications, unsubscribeFromNotifications, socketDisconnect, isSocketConnected, getSocketStatus } from '@/lib/socket-IOClient';
 import { NotificationMessage } from '@/types/notification';
 import { toast } from 'sonner';
+import prescriptionService from '@/actions/profile/prescription';
+import { PrescriptionAccessData } from '@/types/prescription';
 
 export default function PatientNotificationTestPage() {
   const { data: session, status } = useSession();
@@ -114,20 +116,20 @@ export default function PatientNotificationTestPage() {
   const handleNotification = (notification: NotificationMessage) => {
     console.log('Received notification:', notification);
 
-    // Add timestamp if not provided
-    const notificationWithId = {
+    // Add timestamp and id for UI purposes
+    const notificationWithExtras = {
       ...notification,
-      id: notification.id || `${Date.now()}-${Math.random()}`,
-      timestamp: notification.timestamp || new Date().toISOString(),
+      id: notification.requestId || `${Date.now()}-${Math.random()}`,
+      timestamp: new Date().toISOString(),
       isRead: false
     };
 
     // Add to notifications list
-    setNotifications(prev => [notificationWithId, ...prev]);
-    
+    setNotifications(prev => [notificationWithExtras, ...prev]);
+
     // Show toast notification
     toast.info(`🔔 New Notification`, {
-      description: `${notification.senderName || 'Someone'}: ${notification.message}`,
+      description: notification.message,
       duration: 5000,
     });
   };
@@ -141,6 +143,76 @@ export default function PatientNotificationTestPage() {
     setIsConnected(status.connected);
     setConnectionStatus(status.connected ? 'Connected' : 'Disconnected');
     console.log('Manual connection status refresh:', status);
+  };
+
+  const handleApproveRequest = async (requestId: string) => {
+    if (!session?.accessToken) {
+      toast.error('Authentication required to approve request');
+      return;
+    }
+
+    try {
+      toast.loading('Approving request...', { id: `approve-${requestId}` });
+
+      const result = await prescriptionService.approveDoctorRequest(requestId, session.accessToken);
+
+      toast.success('Request approved successfully!', {
+        id: `approve-${requestId}`,
+        description: 'Doctor now has access to your prescription'
+      });
+
+      // Update the notification status in the UI
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.requestId === requestId
+            ? { ...notification, isApproved: true }
+            : notification
+        )
+      );
+
+      console.log('Approval result:', result);
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast.error('Failed to approve request', {
+        id: `approve-${requestId}`,
+        description: 'Please try again later'
+      });
+    }
+  };
+
+  const handleDenyRequest = async (requestId: string) => {
+    if (!session?.accessToken) {
+      toast.error('Authentication required to deny request');
+      return;
+    }
+
+    try {
+      toast.loading('Denying request...', { id: `deny-${requestId}` });
+
+      const result = await prescriptionService.denyDoctorRequest(requestId, session.accessToken);
+
+      toast.success('Request denied successfully!', {
+        id: `deny-${requestId}`,
+        description: 'Doctor access request has been denied'
+      });
+
+      // Update the notification status in the UI
+      setNotifications(prev =>
+        prev.map(notification =>
+          notification.requestId === requestId
+            ? { ...notification, isDenied: true }
+            : notification
+        )
+      );
+
+      console.log('Deny result:', result);
+    } catch (error) {
+      console.error('Error denying request:', error);
+      toast.error('Failed to deny request', {
+        id: `deny-${requestId}`,
+        description: 'Please try again later'
+      });
+    }
   };
 
   if (status === "loading") {
@@ -250,8 +322,8 @@ export default function PatientNotificationTestPage() {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {notifications.map((notification, index) => (
-                <div 
-                  key={notification.id || index} 
+                <div
+                  key={`${notification.requestId || Date.now()}`}
                   className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-2">
@@ -260,36 +332,60 @@ export default function PatientNotificationTestPage() {
                         {notification.notificationType}
                       </Badge>
                       <Badge variant="outline" className="text-xs">
-                        NEW
+                        {(notification as any).isApproved
+                          ? 'APPROVED'
+                          : (notification as any).isDenied
+                          ? 'DENIED'
+                          : 'NEW'}
                       </Badge>
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {new Date(notification.timestamp).toLocaleString()}
-                    </span>
+
+                    {notification.notificationType === 'ACCESS_REQUEST' &&
+                     !(notification as any).isApproved &&
+                     !(notification as any).isDenied &&
+                     notification.requestId && (
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleApproveRequest(notification.requestId!)}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          onClick={() => handleDenyRequest(notification.requestId!)}
+                          size="sm"
+                          variant="destructive"
+                        >
+                          Deny
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="space-y-2">
-                    {notification.senderName && (
-                      <p className="text-sm font-semibold text-blue-700">
-                        From: {notification.senderName}
-                      </p>
-                    )}
-                    
                     <p className="text-sm text-gray-800">
                       {notification.message}
                     </p>
-                    
+
                     {notification.prescriptionName && (
-                      <p className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded font-mono">
-                        Prescription: {notification.prescriptionName}
-                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-base font-medium text-blue-900">
+                          {notification.prescriptionName}
+                        </p>
+                      </div>
                     )}
-                    
-                    {notification.requestId && (
-                      <p className="text-xs text-gray-500">
-                        Request ID: {notification.requestId}
-                      </p>
-                    )}
+
+                    <div className="flex gap-4 text-xs text-gray-500">
+                      <span>Request ID: {notification.requestId}</span>
+                      {notification.prescriptionId && (
+                        <span>Prescription ID: {notification.prescriptionId}</span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-blue-600">
+                      Recipient: {notification.recipientId}
+                    </p>
                   </div>
                 </div>
               ))}

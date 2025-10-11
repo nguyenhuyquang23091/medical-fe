@@ -22,18 +22,32 @@ const profileService = {
     updateProfileAvatar: async (avatar: FormData, token: string): Promise<ProfileResponse> => {
         try {
             const apiClient = createServerApiClient(token);
-            const response = await apiClient.put<ApiResponse<ProfileResponse>>(`${API.UPDATE_PROFILE_AVATAR}`, avatar, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
+
+            // FormData will be auto-detected by the interceptor and Content-Type will be removed
+            const response = await apiClient.put<ApiResponse<ProfileResponse>>(`${API.PROFILE_AVATAR}`, avatar);
             return response.data.result;
         } catch (error) {
             console.error("Error in updating profile avatar:", error);
             throw error;
         }
-    }
+    },
+    
 
+    deleteProfileAvatar : async (token : string) : Promise<ProfileResponse> => {
+        try { 
+            const apiClient = createServerApiClient(token);
+            const response = await apiClient.delete<ApiResponse<ProfileResponse>>(`${API.PROFILE_AVATAR}`)
+            
+            if(!response.data || !response.data.result){
+                throw new Error("Invalid response format")
+            }
+
+            return response.data.result
+        } catch(error){
+            console.error("Errow while deleting profile", error)
+            throw error;
+        }
+    }
 };
 
 export default profileService;

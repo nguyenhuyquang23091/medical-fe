@@ -10,11 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { initSocketIo, socketDisconnect, getSocketStatus, isSocketConnected } from '@/lib/socket-IOClient';
+import { initSocketIo, socketDisconnect, getSocketStatus, isSocketConnected, subscribeToNotifications, unsubscribeFromNotifications } from '@/lib/socket-IOClient';
+import { NotificationMessage } from '@/types/notification';
+import { toast } from 'sonner';
 
 export default function DoctorPrescriptionTestPage() {
   const { data: session, status } = useSession();
-  
+
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -44,6 +46,7 @@ export default function DoctorPrescriptionTestPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected');
+  const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
 
   // Form states for getting patient prescriptions
   const [patientId, setPatientId] = useState('');
@@ -103,6 +106,9 @@ export default function DoctorPrescriptionTestPage() {
           setConnectionStatus('Reconnected');
           console.log(`Doctor - Reconnected after ${attemptNumber} attempts`);
         });
+
+        // Subscribe to notifications
+        subscribeToNotifications(handleNotification);
       }
 
       // Update connection status periodically
@@ -135,12 +141,88 @@ export default function DoctorPrescriptionTestPage() {
     return () => {
       if (status === 'unauthenticated') {
         console.log('Doctor - User logged out, disconnecting Socket.IO');
+        unsubscribeFromNotifications();
         socketDisconnect();
         setIsSocketConnected(false);
         setConnectionStatus('Disconnected');
+        setNotifications([]);
       }
     };
   }, [status, session?.accessToken]);
+
+  // Handle incoming notifications
+  const handleNotification = (notification: NotificationMessage) => {
+    console.log('Doctor - Received notification:', notification);
+
+    // Add timestamp and id for UI purposes
+    const notificationWithExtras = {
+      ...notification,
+      id: notification.requestId || `${Date.now()}-${Math.random()}`,
+      timestamp: new Date().toISOString(),
+      isRead: false
+    };
+
+    // Add to notifications list
+    setNotifications(prev => [notificationWithExtras, ...prev]);
+
+    // Update accessRequest state if this notification is about the current request
+    if (accessRequest && notification.requestId && notification.requestId === accessRequest.id) {
+      if (notification.notificationType === 'ACCESS_APPROVED') {
+        setAccessRequest({
+          ...accessRequest,
+          status: 'APPROVED',
+          respondedAt: new Date().toISOString()
+        });
+        toast.success(`✅ Access Approved!`, {
+          description: notification.message,
+          duration: 5000,
+        });
+      } else if (notification.notificationType === 'ACCESS_DENIED') {
+        setAccessRequest({
+          ...accessRequest,
+          status: 'DENIED',
+          respondedAt: new Date().toISOString()
+        });
+        toast.error(`❌ Access Denied`, {
+          description: notification.message,
+          duration: 5000,
+        });
+      } else {
+        // For other notification types
+        toast.success(`🔔 Notification from Patient`, {
+          description: notification.message,
+          duration: 5000,
+        });
+      }
+    } else {
+      // Show toast notification for notifications not related to current request
+      const toastType = notification.notificationType === 'ACCESS_APPROVED' ? 'success' :
+                       notification.notificationType === 'ACCESS_DENIED' ? 'error' : 'info';
+
+      if (toastType === 'success') {
+        toast.success(`✅ Access Approved!`, {
+          description: notification.message,
+          duration: 5000,
+        });
+      } else if (toastType === 'error') {
+        toast.error(`❌ Access Denied`, {
+          description: notification.message,
+          duration: 5000,
+        });
+      } else {
+        toast.success(`🔔 Notification from Patient`, {
+          description: notification.message,
+          duration: 5000,
+        });
+      }
+    }
+
+    // Auto-refresh prescription list if we have a patient ID and received approval/denial
+    if (patientId && (notification.notificationType === 'ACCESS_APPROVED' || notification.notificationType === 'ACCESS_DENIED')) {
+      console.log('Auto-refreshing prescription list due to status change...');
+      handleGetPatientPrescriptions();
+    }
+  };
 
   const clearMessages = () => {
     setError(null);
@@ -207,11 +289,12 @@ export default function DoctorPrescriptionTestPage() {
         return;
       }
 
-      console.log('Requesting access for:', { patientId: targetPatientId, prescriptionId: targetPrescriptionId });
+      console.log('Requesting access for:', { patientId: targetPatientId, prescriptionId: targetPrescriptionId, reason: accessForm.requestReason });
       const result = await prescriptionService.createPrescriptionAccess(
-        targetPatientId, 
-        targetPrescriptionId, 
-        session.accessToken
+        targetPatientId,
+        targetPrescriptionId,
+        session.accessToken,
+        accessForm.requestReason
       );
       
       setAccessRequest(result);
@@ -247,6 +330,10 @@ export default function DoctorPrescriptionTestPage() {
       prescriptionId: '',
       requestReason: 'Medical consultation and treatment planning'
     });
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
   };
 
   return (
@@ -291,7 +378,7 @@ export default function DoctorPrescriptionTestPage() {
           </div>
           {isSocketConnected && (
             <p className="text-sm text-green-600 mt-2">
-              ✓ Ready to send notifications to patients when requesting prescription access
+              ✓ Ready to send and receive notifications (requests to patients, approvals from patients)
             </p>
           )}
           <div className="mt-4 text-sm text-gray-600">
@@ -576,6 +663,79 @@ export default function DoctorPrescriptionTestPage() {
         </CardContent>
       </Card>
 
+      {/* Received Notifications Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Received Notifications ({notifications.length})</CardTitle>
+            {notifications.length > 0 && (
+              <Button onClick={clearNotifications} variant="outline" size="sm">
+                Clear All
+              </Button>
+            )}
+          </div>
+          <p className="text-sm text-gray-600">
+            Real-time notifications from patients (e.g., access approvals)
+          </p>
+        </CardHeader>
+        <CardContent>
+          {notifications.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p className="text-lg mb-2">No notifications received yet</p>
+              <p className="text-sm">
+                Waiting for patient responses to your access requests...
+              </p>
+              <p className="text-xs mt-4 text-gray-400">
+                When patients approve your prescription access requests, you'll see notifications here
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {notifications.map((notification, index) => (
+                <div
+                  key={`${notification.requestId || Date.now()}-${index}`}
+                  className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge variant="default">
+                      {notification.notificationType}
+                    </Badge>
+                    <span className="text-xs text-gray-500">
+                      {(notification as any).timestamp ? new Date((notification as any).timestamp).toLocaleTimeString() : 'Just now'}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-800 font-medium">
+                      {notification.message}
+                    </p>
+
+                    {notification.prescriptionName && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-sm font-medium text-blue-900">
+                          Prescription: {notification.prescriptionName}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-4 text-xs text-gray-500">
+                      <span>Request ID: {notification.requestId}</span>
+                      {notification.prescriptionId && (
+                        <span>Prescription ID: {notification.prescriptionId}</span>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-blue-600">
+                      From Patient: {notification.recipientId}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Help Section */}
       <Card className="bg-gray-50">
         <CardHeader>
@@ -600,10 +760,20 @@ export default function DoctorPrescriptionTestPage() {
             </p>
           </div>
           <div>
+            <h4 className="font-semibold">Function 3: Receive Patient Notifications</h4>
+            <p className="text-gray-600">
+              • Real-time notifications appear when patients approve your access requests
+              • Notifications include approval confirmations and prescription details
+              • Toast messages will appear for each new notification
+              • All notifications are logged and displayed in the "Received Notifications" section
+            </p>
+          </div>
+          <div>
             <h4 className="font-semibold text-orange-600">Important Notes:</h4>
             <ul className="text-gray-600 list-disc list-inside space-y-1">
               <li>Both functions require valid authentication tokens</li>
               <li>Doctor role permissions are required for these operations</li>
+              <li>Socket.IO must be connected to receive real-time notifications</li>
               <li>Check browser console for detailed API responses and errors</li>
               <li>Use realistic patient IDs and prescription IDs for testing</li>
             </ul>

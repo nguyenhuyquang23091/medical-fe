@@ -23,17 +23,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { AvatarViewer } from "@/components/profile/AvatarViewer"
 
 
 export default function ProfilePage() {
   const { status } = useSession()
-  const { userProfile: profileData, authData, userProfileError, updateUserProfile, updateAuthCredential, updateAvatar } = useUserProfile()
+  const { userProfile: profileData, authData, userProfileError, updateUserProfile, updateAuthCredential, updateAvatar, deleteAvatar } = useUserProfile()
   const [isSaving, setIsSaving] = useState(false)
   const [editData, setEditData] = useState<ProfileUpdateRequest>({
     firstName: "",
     lastName: "",
     dob: "",
     city: "",
+    avatar: "",
+    id: "",
+    userId: "",
+    role: "",
   })
   const [editAuthData, setEditAuthData] = useState<AuthDataUpdateRequest>({
     username: "",
@@ -43,6 +48,8 @@ export default function ProfilePage() {
   const [profileCompletion] = useState(66)
   const [settingsTab, setSettingsTab] = useState<"profile" | "account">("profile")
   const [showPassword, setShowPassword] = useState(false)
+  const [showAvatarViewer, setShowAvatarViewer] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
 
   // Initialize edit data when profile data is loaded
@@ -53,6 +60,10 @@ export default function ProfilePage() {
         lastName: profileData.lastName,
         dob: profileData.dob,
         city: profileData.city,
+        avatar: profileData.avatar,
+        id: profileData.id,
+        userId: profileData.userId,
+        role: profileData.role,
       })
     }
   }, [profileData])
@@ -72,7 +83,7 @@ export default function ProfilePage() {
   const handleSave = async () => {
     try {
       setIsSaving(true)
-    
+
       // Determine which tab is active to know what to update
       if (settingsTab === "profile") {
         // Validate profile data
@@ -81,10 +92,11 @@ export default function ProfilePage() {
           setIsSaving(false)
           return
         }
-        
+
         // Update profile data using context
         await updateUserProfile(editData)
         toast.success("Profile updated successfully")
+        setIsEditDialogOpen(false) // Close dialog on success
       } else if (settingsTab === "account") {
         // Validate account data
         if (!editAuthData.username || !editAuthData.email) {
@@ -92,23 +104,24 @@ export default function ProfilePage() {
           setIsSaving(false)
           return
         }
-        
+
         // Create auth update data
         const updateData: AuthDataUpdateRequest = {
           username: editAuthData.username,
           email: editAuthData.email,
           password: editAuthData.password || ""
         }
-        
+
         // Update auth data using context
         await updateAuthCredential(updateData)
         toast.success("Account updated successfully")
-        
+
         // Reset password field after successful update
         setEditAuthData({
           ...editAuthData,
           password: ""
         })
+        setIsEditDialogOpen(false) // Close dialog on success
       }
     } catch (err) {
       console.error("Failed to update:", err)
@@ -119,14 +132,28 @@ export default function ProfilePage() {
   }
 
   const handleCancel = () => {
+    // Reset form data to original values
     if (profileData) {
       setEditData({
         firstName: profileData.firstName,
         lastName: profileData.lastName,
         dob: profileData.dob,
         city: profileData.city,
+        avatar: profileData.avatar,
+        id: profileData.id,
+        userId: profileData.userId,
+        role: profileData.role,
       })
     }
+    if (authData) {
+      setEditAuthData({
+        username: authData.username,
+        password: "",
+        email: authData.email,
+      })
+    }
+    // Close the dialog
+    setIsEditDialogOpen(false)
   }
 
   const handleInputChange = (field: keyof ProfileUpdateRequest, value: string) => {
@@ -164,6 +191,10 @@ export default function ProfilePage() {
       console.error("Error uploading avatar:", error);
       toast.error("Failed to upload avatar. Please try again.");
     }
+  };
+
+  const handleAvatarDelete = async () => {
+    await deleteAvatar();
   };
 
   // Handle authentication states
@@ -224,10 +255,10 @@ export default function ProfilePage() {
           <div className="flex justify-between items-center mb-6">
             <TabsList className="bg-white border">
               <TabsTrigger value="overview" className="data-[state=active]:bg-blue-50">Overview</TabsTrigger>
-              <TabsTrigger value="projects" className="data-[state=active]:bg-blue-50">Prescriptions</TabsTrigger>
+    
             </TabsList>
             
-            <Dialog>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="icon" className="rounded-md">
                   <UserRoundPen className="h-4 w-4" />
@@ -380,8 +411,11 @@ export default function ProfilePage() {
                             </p>
                           </div>
                         </div>
-                        
-                        <div className="flex justify-end">
+
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" type="button" onClick={handleCancel} disabled={isSaving}>
+                            Cancel
+                          </Button>
                           <Button type="submit" className="bg-blue-600 hover:bg-blue-700 hover:cursor-pointer" disabled={isSaving}>
                             {isSaving ? (
                               <>
@@ -411,25 +445,41 @@ export default function ProfilePage() {
                   </div>
                   <div className="pt-6 px-6 flex flex-col items-center">
                     <div className="relative group">
-                      <Avatar className="h-24 w-24 border-4 border-white shadow-md">
-                        <AvatarImage src={profileData.avatar || "/placeholder.svg"} alt="Profile" />
-                        <AvatarFallback className="bg-blue-500 text-white text-xl font-semibold">
-                          {getInitials(profileData.firstName, profileData.lastName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      {/* Upload Button Overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-400 bg-opacity-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <Camera className="h-6 w-6 text-white" />
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarUpload}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          title="Upload avatar"
-                        />
+                      {/* Avatar - Click to view full-screen */}
+                      <div
+                        className="cursor-pointer"
+                        onClick={() => setShowAvatarViewer(true)}
+                      >
+                        <Avatar className="h-24 w-24 border-4 border-white shadow-md transition-transform hover:scale-105">
+                          <AvatarImage src={profileData.avatar || "/placeholder.svg"} alt="Profile" />
+                          <AvatarFallback className="bg-blue-500 text-white text-xl font-semibold">
+                            {getInitials(profileData.firstName, profileData.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
                       </div>
+
+                      {/* Camera Icon Overlay - Click to upload */}
+                      <div
+                        className="absolute bottom-0 right-0 bg-white rounded-full p-2 shadow-lg cursor-pointer hover:bg-gray-50 transition-colors border-2 border-white"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          document.getElementById('avatar-upload-input')?.click()
+                        }}
+                        title="Change profile photo"
+                      >
+                        <Camera className="h-4 w-4 text-gray-700" />
+                      </div>
+
+                      {/* Hidden file input */}
+                      <input
+                        id="avatar-upload-input"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarUpload}
+                        className="hidden"
+                      />
                     </div>
+
                     <h2 className="text-xl font-bold mt-4">{profileData.firstName} {profileData.lastName}</h2>
                     <p className="text-gray-500 text-sm">Project Manager</p>
                   </div>
@@ -621,6 +671,16 @@ export default function ProfilePage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Avatar Viewer Modal */}
+      <AvatarViewer
+        isOpen={showAvatarViewer}
+        onClose={() => setShowAvatarViewer(false)}
+        avatarUrl={profileData.avatar}
+        userName={`${profileData.firstName} ${profileData.lastName}`}
+        userInitials={getInitials(profileData.firstName, profileData.lastName)}
+        onDelete={handleAvatarDelete}
+      />
     </div>
   )
 }

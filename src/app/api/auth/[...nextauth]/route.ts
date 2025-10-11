@@ -20,7 +20,7 @@ async function refreshAccessToken(token: any) {
             throw new Error("No access token in refresh response");
         }
 
-        console.log("Token refresh successful");    
+        console.log("Token refresh successsful");    
         return {
             ...token,
             accessToken: refreshedTokens.accessToken,

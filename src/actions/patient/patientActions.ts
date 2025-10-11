@@ -3,7 +3,6 @@ import { API } from "@/lib/config/configuration";
 import { Patient, PatientListResponse, PatientFilters, ApiResponse } from "@/types";
 
 const patientService = {
-
     getAllPatients: async (token: string): Promise<Patient[]> => {
         try {
             const apiClient = createServerApiClient(token);

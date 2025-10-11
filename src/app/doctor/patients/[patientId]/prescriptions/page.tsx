@@ -5,14 +5,19 @@ import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, FileText, Calendar, User, Shield, Phone, MapPin, Star, Loader2, CheckCircle, X } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { ArrowLeft, FileText, Calendar, User, Shield, Phone, MapPin, Star, Loader2, CheckCircle, XCircle } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { PrescriptionGeneralData, Patient } from "@/types"
+import { PrescriptionGeneralData, Patient, AccessStatus } from "@/types"
 import { useAuth } from "@/app/context/AuthContext"
 import patientService from "@/actions/patient/patientActions"
 import prescriptionService from "@/actions/profile/prescription"
+import { toast } from "sonner"
+import { initSocketIo, subscribeToNotifications, unsubscribeFromNotifications, socketDisconnect } from "@/lib/socket-IOClient"
+import { NotificationMessage, NotificationType } from "@/types/notification"
 
 export default function PatientPrescriptionsPage() {
     const params = useParams()
@@ -25,7 +30,7 @@ export default function PatientPrescriptionsPage() {
     const [requestingAccessId, setRequestingAccessId] = useState<string | null>(null)
     const [modalState, setModalState] = useState<{
         isOpen: boolean;
-        type: 'loading' | 'success' | 'error';
+        type: 'form' | 'loading';
         title: string;
         message: string;
         prescriptionName?: string;
@@ -36,6 +41,8 @@ export default function PatientPrescriptionsPage() {
         message: '',
     })
     const [currentLoadingStep, setCurrentLoadingStep] = useState(0)
+    const [requestReason, setRequestReason] = useState('Medical consultation and treatment planning')
+    const [pendingPrescription, setPendingPrescription] = useState<PrescriptionGeneralData | null>(null)
 
     const loadingSteps = [
         { message: "Preparing request...", duration: 800 },
@@ -56,31 +63,16 @@ export default function PatientPrescriptionsPage() {
             setLoading(true)
             setError(null)
 
-            console.log("Loading patient data with userId:", params.patientId)
-            console.log("Using access token:", session.accessToken ? "Present" : "Missing")
-
             // Load patient info first (params.patientId is actually userId now)
             const patient = await patientService.getPatientById(params.patientId as string, session.accessToken)
-            console.log("Patient loaded successfully:", patient)
             setPatientInfo(patient)
 
             // Then load prescriptions using the patient's user ID
-            console.log("Loading prescriptions for patient userId:", patient.userId)
             const prescriptions = await prescriptionService.getPatientPrescriptionsList(patient.userId, session.accessToken)
-            console.log("Prescriptions loaded successfully:", prescriptions)
             setPrescriptions(prescriptions)
 
         } catch (error) {
             console.error("Failed to load patient data:", error)
-            if (error && typeof error === 'object' && 'response' in error) {
-                const apiError = error as any
-                console.error("API Error details:", {
-                    status: apiError.response?.status,
-                    statusText: apiError.response?.statusText,
-                    data: apiError.response?.data,
-                    url: apiError.config?.url
-                })
-            }
             setError("Failed to load patient information. Please try again.")
         } finally {
             setLoading(false)
@@ -92,6 +84,52 @@ export default function PatientPrescriptionsPage() {
             loadPatientData()
         }
     }, [session?.accessToken, params.patientId])
+
+    // Initialize Socket.IO for real-time notifications
+    useEffect(() => {
+        if (!session?.accessToken) return
+
+        initSocketIo(session.accessToken)
+
+        // Handle incoming notifications
+        const handleNotification = (notification: NotificationMessage) => {
+            // Only handle prescription access approval/denial notifications
+            if (
+                notification.notificationType === NotificationType.ACCESS_APPROVED ||
+                notification.notificationType === NotificationType.ACCESS_DENIED
+            ) {
+                const isApproved = notification.notificationType === NotificationType.ACCESS_APPROVED
+
+                // Show toast notification
+                if (isApproved) {
+                    toast('Access Granted!', {
+                        description: notification.message,
+                        duration: 5000,
+                        icon: <CheckCircle className="h-5 w-5 text-white" />,
+                        className: '!bg-emerald-600 !text-white !border-emerald-700',
+                        descriptionClassName: '!text-white',
+                    })
+                } else {
+                    toast.error('Access Denied', {
+                        description: notification.message,
+                        duration: 5000,
+                        icon: <XCircle className="h-5 w-5 text-red-600" />,
+                    })
+                }
+
+                // Refresh prescriptions list to reflect updated access status
+                loadPatientData()
+            }
+        }
+
+        // Subscribe to notifications
+        subscribeToNotifications(handleNotification)
+
+        // Cleanup on unmount
+        return () => {
+            unsubscribeFromNotifications()
+        }
+    }, [session?.accessToken])
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
@@ -132,14 +170,25 @@ export default function PatientPrescriptionsPage() {
         await new Promise(resolve => setTimeout(resolve, totalTime + 200))
     }
 
-    const handleRequestAccess = async (prescription: PrescriptionGeneralData) => {
-        if (!session?.accessToken || !patientInfo) {
-            setError("No access token or patient information available")
+    const showRequestForm = (prescription: PrescriptionGeneralData) => {
+        setPendingPrescription(prescription)
+        setModalState({
+            isOpen: true,
+            type: 'form',
+            title: 'Request Prescription Access',
+            message: `Please provide a reason for accessing ${patientInfo?.firstName}'s prescription.`,
+            prescriptionName: prescription.prescriptionName
+        })
+    }
+
+    const handleRequestAccess = async () => {
+        if (!session?.accessToken || !patientInfo || !pendingPrescription) {
+            setError("No access token, patient information, or prescription selected")
             return
         }
 
         try {
-            setRequestingAccessId(prescription.id)
+            setRequestingAccessId(pendingPrescription.id)
             setError(null) // Clear any previous errors
 
             // Show loading modal immediately
@@ -148,53 +197,51 @@ export default function PatientPrescriptionsPage() {
                 type: 'loading',
                 title: 'Sending Request...',
                 message: `Please wait while we send your access request to ${patientInfo.firstName}.`,
-                prescriptionName: prescription.prescriptionName
+                prescriptionName: pendingPrescription.prescriptionName
             })
-
-            console.log('Requesting access to prescription:', prescription.prescriptionName)
-            console.log('Prescription ID:', prescription.id)
-            console.log('Patient User ID:', patientInfo.userId)
 
             // Start API call and loading steps in parallel
             const apiCallPromise = prescriptionService.createPrescriptionAccess(
                 patientInfo.userId,
-                prescription.id,
-                session.accessToken
+                pendingPrescription.id,
+                session.accessToken,
+                requestReason
             )
 
             const loadingStepsPromise = runLoadingSteps()
 
             // Wait for both API call and loading steps to complete
-            const [accessRequest] = await Promise.all([apiCallPromise, loadingStepsPromise])
+            await Promise.all([apiCallPromise, loadingStepsPromise])
 
-            console.log('Prescription access request created:', accessRequest)
+            // Close the loading modal
+            setModalState(prev => ({ ...prev, isOpen: false }))
 
-            // Show success modal after loading phase completes
-            setModalState({
-                isOpen: true,
-                type: 'success',
-                title: 'Request Sent!',
-                message: `Your access request has been sent to ${patientInfo.firstName}. You'll be notified once they respond.`,
-                prescriptionName: prescription.prescriptionName
+            // Show success toast notification from the right
+            toast('Request Sent!', {
+                description: `Your access request has been sent to ${patientInfo.firstName}. You'll be notified once they respond.`,
+                duration: 4000,
+                icon: <CheckCircle className="h-5 w-5 text-emerald-600" />,
+                className: '!bg-white !text-gray-900 !border-gray-200',
+                descriptionClassName: '!text-gray-600',
             })
 
-            // Auto-close success modal after 1.5 seconds
-            setTimeout(() => {
-                setModalState(prev => ({ ...prev, isOpen: false }))
-            }, 1500)
+            // Reset form
+            setRequestReason('Medical consultation and treatment planning')
+            setPendingPrescription(null)
 
             // Refresh the prescriptions list to reflect any status changes
             await loadPatientData()
         } catch (error) {
             console.error("Failed to request prescription access:", error)
 
-            // Show error modal (no timing restrictions for errors)
-            setModalState({
-                isOpen: true,
-                type: 'error',
-                title: 'Request Failed',
-                message: 'Failed to send access request. Please try again.',
-                prescriptionName: prescription.prescriptionName
+            // Close the loading modal
+            setModalState(prev => ({ ...prev, isOpen: false }))
+
+            // Show error toast notification from the right
+            toast.error('Request Failed', {
+                description: 'Failed to send access request. Please try again.',
+                duration: 4000,
+                icon: <XCircle className="h-5 w-5 text-red-600" />,
             })
         } finally {
             setRequestingAccessId(null)
@@ -205,6 +252,9 @@ export default function PatientPrescriptionsPage() {
         setModalState(prev => ({ ...prev, isOpen: false }))
         // Reset loading state
         setCurrentLoadingStep(0)
+        // Reset form state
+        setRequestReason('Medical consultation and treatment planning')
+        setPendingPrescription(null)
     }
 
     const handleBackToPatients = () => {
@@ -378,9 +428,30 @@ export default function PatientPrescriptionsPage() {
                                         </div>
                                     )}
                                 </div>
-                                <Badge className={getStatusColor(prescription.status)}>
-                                    {prescription.status}
-                                </Badge>
+                                <div className="flex flex-col gap-2 items-end">
+                                    <Badge className={getStatusColor(prescription.status)}>
+                                        {prescription.status}
+                                    </Badge>
+                                    {prescription.accessStatus && prescription.accessStatus !== AccessStatus.NO_REQUEST && (
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                prescription.accessStatus === AccessStatus.APPROVED
+                                                    ? 'bg-green-50 text-green-700 border-green-200'
+                                                    : prescription.accessStatus === AccessStatus.PENDING
+                                                    ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                                    : prescription.accessStatus === AccessStatus.DENIED
+                                                    ? 'bg-red-50 text-red-700 border-red-200'
+                                                    : ''
+                                            }
+                                        >
+                                            {prescription.accessStatus === AccessStatus.APPROVED ? '✓ Access Granted' :
+                                             prescription.accessStatus === AccessStatus.PENDING ? '⏳ Pending' :
+                                             prescription.accessStatus === AccessStatus.DENIED ? '✗ Denied' :
+                                             ''}
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
                         </CardHeader>
 
@@ -403,24 +474,64 @@ export default function PatientPrescriptionsPage() {
                             </div>
 
                             <div className="pt-4 border-t">
-                                <Button
-                                    className="w-full flex items-center gap-2 cursor-pointer transition-all duration-200"
-                                    onClick={() => handleRequestAccess(prescription)}
-                                    variant="outline"
-                                    disabled={loading || requestingAccessId === prescription.id}
-                                >
-                                    {requestingAccessId === prescription.id ? (
-                                        <>
+                                {prescription.accessStatus === AccessStatus.APPROVED ? (
+                                    <Button
+                                        className="w-full flex items-center gap-2 cursor-pointer transition-all duration-200 bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => router.push(`/doctor/patients/${params.patientId}/dashboard`)}
+                                    >
+                                        <CheckCircle className="h-4 w-4" />
+                                        View Patient Dashboard
+                                    </Button>
+                                ) : prescription.accessStatus === AccessStatus.PENDING ? (
+                                    <div className="w-full space-y-3">
+                                        <Button
+                                            className="w-full flex items-center gap-2 cursor-pointer transition-all duration-200 bg-yellow-50 hover:bg-yellow-50 text-yellow-700 border-yellow-200"
+                                            variant="outline"
+                                            disabled
+                                        >
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            Processing Request...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Shield className="h-4 w-4" />
-                                            Request Access
-                                        </>
-                                    )}
-                                </Button>
+                                            Access Request Pending
+                                        </Button>
+                                        <div className="flex items-center justify-center space-x-1">
+                                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                                        </div>
+                                        <p className="text-xs text-center text-yellow-600">
+                                            Waiting for patient response...
+                                        </p>
+                                    </div>
+                                ) : prescription.accessStatus === AccessStatus.DENIED ? (
+                                    <Button
+                                        className="w-full flex items-center gap-2 cursor-pointer transition-all duration-200 bg-red-50 hover:bg-red-100 text-red-700 border-red-200"
+                                        onClick={() => showRequestForm(prescription)}
+                                        variant="outline"
+                                        disabled={loading || requestingAccessId === prescription.id}
+                                    >
+                                        <XCircle className="h-4 w-4" />
+                                        Request Denied - Try Again
+                                    </Button>
+                                ) : (
+                                    // Handles NO_REQUEST, null, undefined
+                                    <Button
+                                        className="w-full flex items-center gap-2 cursor-pointer transition-all duration-200 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                                        onClick={() => showRequestForm(prescription)}
+                                        variant="outline"
+                                        disabled={loading || requestingAccessId === prescription.id}
+                                    >
+                                        {requestingAccessId === prescription.id ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                Processing Request...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Shield className="h-4 w-4" />
+                                                Request Access
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -445,6 +556,61 @@ export default function PatientPrescriptionsPage() {
                     className="sm:max-w-md"
                     showCloseButton={modalState.type !== 'loading'}
                 >
+                    {modalState.type === 'form' && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>{modalState.title}</DialogTitle>
+                                <DialogDescription>
+                                    {modalState.message}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="prescription-name">Prescription</Label>
+                                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                                        <p className="text-sm font-medium text-blue-900">
+                                            {modalState.prescriptionName}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="request-reason">
+                                        Request Reason <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Textarea
+                                        id="request-reason"
+                                        placeholder="Enter your reason for requesting access to this prescription..."
+                                        value={requestReason}
+                                        onChange={(e) => setRequestReason(e.target.value)}
+                                        rows={4}
+                                        className="resize-none"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        This reason will be visible to the patient when they review your access request.
+                                    </p>
+                                </div>
+                            </div>
+                            <DialogFooter className="gap-2 sm:gap-0">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeModal}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleRequestAccess}
+                                    disabled={!requestReason.trim()}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Shield className="h-4 w-4" />
+                                    Send Request
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+
                     {modalState.type === 'loading' && (
                         <>
                             <DialogHeader>
@@ -485,43 +651,6 @@ export default function PatientPrescriptionsPage() {
                                             />
                                         ))}
                                     </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {modalState.type === 'success' && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>{modalState.title}</DialogTitle>
-                                <DialogDescription>
-                                    {modalState.message}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex flex-col items-center justify-center py-6 space-y-4">
-                                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
-                                    <CheckCircle className="w-8 h-8 text-emerald-600" />
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {modalState.type === 'error' && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>{modalState.title}</DialogTitle>
-                                <DialogDescription>
-                                    {modalState.message}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="flex flex-col items-center justify-center py-6 space-y-4">
-                                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                                    <X className="w-8 h-8 text-red-600" />
-                                </div>
-                                <div className="pt-4">
-                                    <Button onClick={closeModal} variant="outline" className="w-full">
-                                        Close
-                                    </Button>
                                 </div>
                             </div>
                         </>

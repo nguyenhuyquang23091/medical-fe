@@ -1,24 +1,70 @@
 export interface NotificationMessage {
     id?: string;
-    recipientUserId: string; 
-    senderUserId?: string;
-    senderName?: string;
-    notificationType: NotificationType;
-    message: string;
-    requestId?: string;
-    prescriptionId?: string;
-    prescriptionName?: string;
-    timestamp: string;
+    recipientUserId: string;
+    notificationType?: string | null;
+    title?: string | null;
+    message?: string | null;
     isRead?: boolean;
-    data?: Record<string, any>;
+    isProcessed?: boolean;
+    createdAt?: string | null;
+    readAt?: string | null;
+    // Metadata for flexible notification data (matches backend Map<String, Object>)
+    metadata?: {
+        requestId?: string;
+        prescriptionId?: string;
+        prescriptionName?: string;
+        doctorId?: string;
+        doctorName?: string;
+        doctorAvatar?: string;
+        status?: string;
+        [key: string]: any; 
+    } | null;
+}
+
+export interface PageResponse<T> {
+    currentPage: number;
+    totalPages: number;
+    pageSize: number;
+    totalElements: number;
+    data: T[];
 }
 
 export enum NotificationType {
-    PRESCRIPTION_ACCESS_REQUEST = 'PRESCRIPTION_ACCESS_REQUEST',
-    PRESCRIPTION_ACCESS_APPROVED = 'PRESCRIPTION_ACCESS_APPROVED',
-    PRESCRIPTION_ACCESS_DENIED = 'PRESCRIPTION_ACCESS_DENIED',
-    PRESCRIPTION_UPDATED = 'PRESCRIPTION_UPDATED',
-    PRESCRIPTION_CREATED = 'PRESCRIPTION_CREATED',
-    GENERAL_NOTIFICATION = 'GENERAL_NOTIFICATION'
+    ACCESS_REQUEST = 'ACCESS_REQUEST',
+    ACCESS_APPROVED = 'ACCESS_APPROVED',
+    ACCESS_DENIED = 'ACCESS_DENIED',
+    ACCESS_PROCESSED = 'ACCESS_PROCESSED'
 }
 
+export interface NotificationState {
+    notifications: NotificationMessage[];
+    unreadCount: number;
+    isConnected: boolean;
+    currentPage: number;
+    totalPages: number;
+    totalElements: number;
+    pageSize: number;
+    isLoading: boolean;
+    error: string | null;
+}
+
+
+
+export interface NotificationContextType {
+    notifications: NotificationMessage[];
+    unreadCount: number;
+    isConnected: boolean;
+    currentPage: number;
+    totalPages: number;
+    totalElements: number;
+    pageSize: number;
+    isLoading: boolean;
+    error: string | null;
+    loadNotifications: (page?: number, size?: number) => Promise<void>;
+    markAsRead: (notificationId: string) => Promise<void>;
+    markAsUnread: (notificationId: string) => Promise<void>;
+    markAllAsRead: () => Promise<void>;
+    clearNotification: (notificationId: string) => Promise<void>;
+    clearAllNotifications: () => Promise<void>;
+    setPage: (page: number) => void;
+}

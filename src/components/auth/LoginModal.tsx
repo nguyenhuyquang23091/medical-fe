@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "../../app/context/AuthContext"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { loginSchema } from "@/types"
 import { z } from "zod";
 import { toast } from "sonner"
@@ -13,9 +13,10 @@ import { Loader2, AlertTriangle } from "lucide-react"
 export default function LoginModal() {
   const { isLoginModalOpen, closeLoginModal, switchToRegister, login, loginError, isLoading, isLoggedIn, status, hasJustLoggedIn, resetLoginState } = useAuth();
   const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");                          
+  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const toastShownRef = useRef(false);
 
   // Reset errors when modal opens/closes
   useEffect(() => {
@@ -24,13 +25,21 @@ export default function LoginModal() {
     }
   }, [isLoginModalOpen]);
 
-  // Show success toast only when user has just logged in
+  // Show success toast only once when user has just logged in
   useEffect(() => {
-    if (hasJustLoggedIn && isLoggedIn && status === 'authenticated' && !isLoginModalOpen) {
+    if (hasJustLoggedIn && isLoggedIn && status === 'authenticated' && !isLoginModalOpen && !toastShownRef.current) {
+      toastShownRef.current = true;
       toast.success('Logged in successfully!');
-      resetLoginState(); // Reset the flag after showing toast
+      resetLoginState();
     }
   }, [hasJustLoggedIn, isLoggedIn, status, isLoginModalOpen, resetLoginState]);
+
+  // Reset toast flag when component unmounts or user logs out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      toastShownRef.current = false;
+    }
+  }, [isLoggedIn]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

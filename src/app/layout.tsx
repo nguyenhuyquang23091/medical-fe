@@ -4,6 +4,7 @@ import ConditionalFooter from "@/components/layout/ConditionalFooter"
 import ConditionalChatBot from "@/components/layout/ConditionalChatBot"
 import { Montserrat } from "next/font/google";
 import { AuthProvider } from "@/app/context/AuthContext";
+import { NotificationProvider } from "@/app/context/NotificationContext";
 import { AuthenticatedApp } from "@/components/app/AuthenticatedApp";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
@@ -21,7 +22,8 @@ export default function RootLayout({
     <html lang="en" className={montserrat.className}>
       <body>
        <Providers>
-          <AuthProvider>
+        <AuthProvider>
+          <NotificationProvider>
             <AuthenticatedApp>
               <div>
                 <ConditionalNavbar />
@@ -32,12 +34,13 @@ export default function RootLayout({
                 <LoginModal/>
                 <RegisterModal/>
                 <ConditionalChatBot/>
-                <Toaster position="top-right" />
               </div>
             </AuthenticatedApp>
-          </AuthProvider>
+          </NotificationProvider>
+        </AuthProvider>
         </Providers>
-
+        {/* Move Toaster outside to ensure it's always on top */}
+        <Toaster position="top-right" richColors expand={true} />
       </body>
     </html>
   )

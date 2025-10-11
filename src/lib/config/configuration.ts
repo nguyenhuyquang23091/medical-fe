@@ -12,8 +12,10 @@ export const API = {
     PROFILE : "/profile/users",
     GET_AUTH_PROFILE : "/identity/users/my-info",
     UPDATE_AUTH_PROFILE : "/identity/users/my-info",
-    UPDATE_PROFILE_AVATAR : "/profile/users/avatar",
-    PRESCRIPTION : "/profile/prescription"
+    PROFILE_AVATAR : "/profile/users/avatar",
+    PRESCRIPTION : "/profile/prescription",
+    DOCTOR_REQUEST_ACTION : "profile/prescription/access-request",
+    NOTIFICATIONS : "/notifications"
 }
 
 export const PUBLIC_ENDPOINT  = new Set([

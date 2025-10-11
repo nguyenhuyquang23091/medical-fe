@@ -113,7 +113,6 @@ export default function DoctorDashboard() {
                         </div>
                     </CardContent>
                 </Card>
-
                 {/* Quick Actions */}
                 <Card>
                     <CardHeader>

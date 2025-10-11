@@ -1,42 +1,63 @@
 import { createServerApiClient } from "@/lib/serverApiClient";
 import { API } from "@/lib/config/configuration";
 import { ApiResponse } from "@/types";
+import { NotificationMessage, PageResponse } from "@/types/notification";
 
-export interface NotificationRequest {
-    patientId: string;
-    prescriptionId: string;
-    message?: string;
-    notificationType?: string;
-}
-
-const notificationService = {
-    sendNotification: async (request: NotificationRequest, token: string): Promise<any> => {
+const notificationService  = {
+    getMyNotifications : async(token : string, page: number = 1, size: number = 10) : Promise<PageResponse<NotificationMessage>> => {
         try {
-            const httpClient = createServerApiClient(token);
+            const httpClient = createServerApiClient(token)
+            const response = await httpClient.get<ApiResponse<PageResponse<NotificationMessage>>>(`${API.NOTIFICATIONS}/my-notifications`, {
+                params: { page, size }
+            });
 
-            // Prepare notification request
-            const notificationData = {
-                patientId: request.patientId,
-                prescriptionId: request.prescriptionId,
-                message: request.message || "Doctor requesting access to prescription",
-                notificationType: request.notificationType || "ACCESS_REQUEST"
-            };
+            if(!response.data || !response.data.result){
+                throw new Error("Invalid Response");
+            }
 
-            console.log('Sending notification request:', notificationData);
+            const result = response.data.result;
+            
+            if (!result.data || !Array.isArray(result.data)) {
+                throw new Error("Invalid Response: expected PageResponse");
+            }
 
-            const response = await httpClient.post<ApiResponse<any>>(`${API.NOTIFICATION}/send-notification`, notificationData);
-            console.log('Notification Response:', response.data);
+            return result;
 
-            if (!response.data || !response.data.result) {
-                throw new Error('Invalid response format');
+        } catch (error){
+            console.error("Error while getting notifications", error);
+            throw error;
+        }
+    },
+    
+    markAsRead : async(token: string, notificationId: string) : Promise<NotificationMessage> => {
+        try {
+            const httpClient = createServerApiClient(token)
+            const response = await httpClient.put<ApiResponse<NotificationMessage>>(`${API.NOTIFICATIONS}/my-notifications/${notificationId}`);
+
+            if(!response.data || !response.data.result){
+                throw new Error("Invalid Response");
             }
 
             return response.data.result;
-        } catch (error) {
-            console.error("Error in sending notification:", error);
-            throw error;
+        } catch (error){
+            console.error("Error while marking notification as read", error)
+            throw error
+        }
+    },
+
+    deleteNotification : async( token : string, notificationId : string ) : Promise<void> => {
+        try {
+            const httpClient = createServerApiClient(token)
+            const response = await httpClient.delete(`${API.NOTIFICATIONS}/${notificationId}`);
+
+            if(response.status !== 200 && response.status !== 204){
+                throw new Error("Failed to delete notification")
+            }
+        } catch(error){
+            console.error("Error while deleting notification", error)
+            throw error
         }
     }
-};
+}
 
 export default notificationService;

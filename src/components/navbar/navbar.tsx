@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useNavbarProfile } from "@/hooks/useNavbarProfile";
 import { ProfileDropdown } from "../ui/profile-dropdown";
 import { NavbarLoadingSkeleton } from "../ui/profile-loading-skeleton";
+import { NotificationDropdown } from "../patient/NotificationDropdown";
 
 export default function Navbar(){
     const router = useRouter();
@@ -49,7 +50,7 @@ export default function Navbar(){
         { title: "Home", href: "/" },
         { title: "Blog", href: "/" },
         { title: "Page", href: "/" },
-        { title: "Doctors", href: "/doctor" },
+        {title : "Appointments", href: "/appointments"},
         { title: "Contact", href: "/" },
     ];
 
@@ -113,15 +114,13 @@ export default function Navbar(){
                         <NavbarLoadingSkeleton />
                     ) : isLoggedIn ? (
                         <>
-                            <Button asChild className="bg-blue-400 hover:bg-blue-500">
-                            <Link href="/appointment" className="flex items-center"> Making an Appointment</Link>
-                        </Button>
-                    <ProfileDropdown
-                        onViewProfile={handleViewProfile}
-                        onSettings={handleSettings}
-                        onAppointments={handleViewAppointments}
-                        onLogout={handleLogout}
-                    />
+                            <NotificationDropdown />
+                            <ProfileDropdown
+                                onViewProfile={handleViewProfile}
+                                onSettings={handleSettings}
+                                onAppointments={handleViewAppointments}
+                                onLogout={handleLogout}
+                            />
                         </>
                     ) : (
                         <>

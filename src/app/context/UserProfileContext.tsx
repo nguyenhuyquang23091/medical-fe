@@ -7,26 +7,28 @@ import { useSession } from 'next-auth/react';
 import {
   updateProfileAction,
   updateAuthAction,
-  updateAvatarAction
+  updateAvatarAction,
+  deleteAvatarAction
 } from '@/actions/profile/profileActions';
 
 type UserProfileContextType = {
   // Profile data
   userProfile: ProfileResponse | null;
   authData: IdentityResponse | null;
-  
+
   // Loading states
   isLoading: boolean;
-  
+
   // Error states
   userProfileError: string | null;
-  
+
   // Methods
   fetchUserProfile: () => Promise<void>;
   refreshUserData: () => Promise<void>;
   updateUserProfile: (updateRequest: ProfileUpdateRequest) => Promise<void>;
   updateAuthCredential: (authUpdateRequest: AuthDataUpdateRequest) => Promise<void>;
-  updateAvatar : (file : File) => Promise<void>;
+  updateAvatar: (file: File) => Promise<void>;
+  deleteAvatar: () => Promise<void>;
 }
 
 // Create Context
@@ -122,6 +124,24 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     }
   }
 
+  const deleteAvatar = async () => {
+    try {
+      setIsUploadingAvatar(true);
+
+      // Use server action to delete avatar
+      await deleteAvatarAction();
+
+      // Fetch fresh data
+      await fetchUserProfile();
+
+    } catch (error) {
+      console.error("Error in deleting profile avatar:", error);
+      throw error;
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
   const updateAuthCredential = async (authUpdateRequest: AuthDataUpdateRequest) => {
     try {
         setIsLoading(true);
@@ -158,8 +178,8 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     }
   }, [status]);
 
-  // Value for consumer 
-  const value: UserProfileContextType = { 
+  // Value for consumer
+  const value: UserProfileContextType = {
     userProfile,
     authData,
     isLoading,
@@ -168,7 +188,8 @@ export function UserProfileProvider({ children }: UserProfileProviderProps) {
     refreshUserData,
     updateUserProfile,
     updateAuthCredential,
-    updateAvatar
+    updateAvatar,
+    deleteAvatar
   };
 
   return (

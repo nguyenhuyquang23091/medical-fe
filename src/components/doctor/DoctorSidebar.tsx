@@ -30,6 +30,7 @@ import { useAuth } from "@/app/context/AuthContext"
 import { useRouter } from "next/navigation"
 import { DoctorProfileDropdown } from "./DoctorProfileDropdown"
 import { UpcomingAppointmentCard } from "./UpcomingAppointmentCard"
+import { NotificationBadge } from "./NotificationBadge"
 import { UpcomingAppointment, AppointmentType, AppointmentStatus } from "@/types/appointment"
 import { useState } from "react"
 
@@ -79,6 +80,9 @@ export function DoctorSidebar() {
   const { logout } = useAuth()
   const router = useRouter()
   const [showUpcomingAppointment, setShowUpcomingAppointment] = useState(true)
+  
+  // Mock unread notifications count - replace with real data later
+  const unreadNotificationsCount = 5
 
   // Mock upcoming appointment data
   const upcomingAppointment: UpcomingAppointment = {
@@ -157,9 +161,14 @@ export function DoctorSidebar() {
                     asChild
                     isActive={pathname === item.url}
                   >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                    <Link href={item.url} className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </div>
+                      {item.title === "Notifications" && unreadNotificationsCount > 0 && (
+                        <NotificationBadge count={unreadNotificationsCount} />
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -1,3 +1,11 @@
+// AccessStatus enum matching backend values
+export enum AccessStatus {
+    NO_REQUEST = 'NO_REQUEST',
+    PENDING = 'PENDING',
+    APPROVED = 'APPROVED',
+    DENIED = 'DENIED'
+}
+
 export interface PrescriptionRequest {
     userId: string;
     userProfileId : string;
@@ -10,15 +18,17 @@ export interface PrescriptionRequest {
 }
 
 export interface PrescriptionResponse {
-     userId: string;
+    id?: string; // Prescription ID from backend
+    userId: string;
     userProfileId : string;
+    prescriptionName?: string; // Name of the prescription
     doctorId: string;
     status: string;
-    imageUrls? : string[];
+    imageURLS? : string[]; // Exact backend field name (all caps "URLS")
     prescriptionData : PrescriptionData[];
     createdAt: string;
     updatedAt: string;
-    
+
 }
 
 export interface PrescriptionUpdateRequest {
@@ -28,16 +38,25 @@ export interface PrescriptionUpdateRequest {
     updatedAt: string;
 }
 
-interface PrescriptionData {
-    medicationName : string,
-    dosage : string,
-    frequency : string,
-    instructions : string,
-    doctorNotes : string
+
+export interface PrescriptionData {
+    // Medication fields (from doctor prescriptions)
+    medicationName?: string;
+    dosage?: string;
+    frequency?: string;
+    instructions?: string;
+    doctorNotes?: string;
+
+    // Blood sugar fields (from patient prescriptions)
+    bloodSugarLevel?: string;
+    readingType?: string;
+    measurementDate?: string;
+    bloodSugarCategory?: string;
 }
 
 
 export interface PrescriptionAccessData{
+    id?: string,
     prescriptionId: string,
     patientUserId : string,
     doctorUserId : string,
@@ -55,6 +74,28 @@ export interface PrescriptionGeneralData {
     prescriptionName : string;
     doctorId: string;
     status: string;
+    accessStatus?: AccessStatus | null;
     createdAt: string;
     updatedAt: string;
+}
+
+// Patient Prescription Creation Types (matching backend PatientPrescriptionCreateRequest)
+export interface PatientPrescriptionDataRequest {
+    bloodSugarLevel: string;
+    readingType: string; // FASTING, BEFORE_MEAL, AFTER_MEAL, BEDTIME, RANDOM
+    measurementDate: string; // ISO-8601 format
+    bloodSugarCategory?: string; // LOW, NORMAL, HIGH, VERY_HIGH
+}
+
+export interface PatientPrescriptionCreateRequest {
+    prescriptionName: string;
+    imageURLS: string[]; // Exact backend field name (all caps "URLS")
+    prescriptionData: PatientPrescriptionDataRequest[];
+}
+
+// Patient Prescription Update Type (matching backend PatientPrescriptionUpdateRequest)
+export interface PatientPrescriptionUpdateRequest {
+    prescriptionName?: string;
+    imageURLS?: string[]; // Exact backend field name (all caps "URLS")
+    prescriptionData?: PatientPrescriptionDataRequest[];
 }

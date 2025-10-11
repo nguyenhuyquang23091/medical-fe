@@ -69,3 +69,25 @@ export async function updateAvatarAction(formData: FormData) {
     throw error;
   }
 }
+
+// Server action to delete avatar
+export async function deleteAvatarAction() {
+  try {
+    // Get server-side session and token
+    const session = await auth();
+
+    if (!session?.accessToken) {
+      throw new Error("No valid session or access token");
+    }
+
+    // Delete avatar via unified service with token
+    const result = await profileService.deleteProfileAvatar(session.accessToken);
+
+    console.log("Avatar deleted");
+
+    return { success: true, data: result };
+  } catch (error) {
+    console.error("Error deleting avatar:", error);
+    throw error;
+  }
+}

@@ -187,9 +187,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoginModalOpen(true);
   };
 
-  const resetLoginState = () => {
+  const resetLoginState = React.useCallback(() => {
     setHasJustLoggedIn(false);
-  };
+  }, []);
   
   // Value for consumer
   const value = {
