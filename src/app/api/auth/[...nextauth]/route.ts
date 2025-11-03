@@ -64,7 +64,7 @@ export const {handlers, signIn, signOut, auth} = NextAuth({
                             refreshToken : result.refreshToken,
                             authenticated: result.authenticated,
                             role: result.role,
-                            accessTokenExpires: result.accessTokenExpires, // Backend provides timestamp
+                            accessTokenExpires: result.accessTokenExpires, 
                         };
                     }
                 

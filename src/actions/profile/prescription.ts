@@ -1,7 +1,7 @@
 import { createServerApiClient } from "@/lib/serverApiClient";
 import { API } from "@/lib/config/configuration";
 import { ApiResponse } from "@/types";
-import { PrescriptionAccessData, PrescriptionRequest, PrescriptionResponse, PrescriptionUpdateRequest, PrescriptionGeneralData, PatientPrescriptionCreateRequest, PatientPrescriptionUpdateRequest } from "@/types/prescription";
+import { PrescriptionAccessData, PrescriptionRequest, PrescriptionResponse, PrescriptionUpdateRequest, PrescriptionGeneralData, PatientPrescriptionCreateRequest, PatientPrescriptionUpdateRequest, DoctorPrescriptionUpdateRequest } from "@/types/prescription";
 
 const prescriptionService = {
 
@@ -62,24 +62,6 @@ const prescriptionService = {
             return response.data.result;
         } catch (error) {
             console.error("Error in fetching prescription details:", error);
-            throw error;
-        }
-    },
-
-    updateMyPrescriptions : async(prescriptionId: string, updateRequest: PrescriptionUpdateRequest, token: string) : Promise<PrescriptionResponse> => {
-        try {
-            const httpClient = createServerApiClient(token);
-            const response = await httpClient.put<ApiResponse<PrescriptionResponse>>(`${API.PRESCRIPTION}/myPrescription/${prescriptionId}`, updateRequest);
-
-            console.log('Update My Prescriptions Response:', response.data);
-
-            if (!response.data || !response.data.result){
-                throw new Error('Invalid response format');
-            }
-
-            return response.data.result;
-        } catch (error) {
-            console.error("Error in updating prescriptions:", error);
             throw error;
         }
     },
@@ -213,6 +195,64 @@ const prescriptionService = {
             return response.data.result;
         } catch (error) {
             console.error("Error in creating prescription access:", error);
+            throw error;
+        }
+    },
+
+    // Doctor update prescription (after access granted)
+    doctorUpdatePrescription : async (prescriptionId: string, request: DoctorPrescriptionUpdateRequest, token: string) : Promise<PrescriptionResponse> => {
+        try {
+            const httpClient = createServerApiClient(token);
+            const response = await httpClient.put<ApiResponse<PrescriptionResponse>>(
+                `${API.PRESCRIPTION}/doctor/prescription/${prescriptionId}`,
+                request
+            );
+
+            console.log('Doctor Update Prescription Response:', response.data);
+
+            if (!response.data || !response.data.result) {
+                throw new Error('Invalid response format');
+            }
+
+            return response.data.result;
+        } catch (error) {
+            console.error("Error in doctor updating prescription:", error);
+            throw error;
+        }
+    },
+
+    // Doctor delete prescription (after access granted)
+    doctorDeletePrescription : async (prescriptionId: string, token: string) : Promise<void> => {
+        try {
+            const httpClient = createServerApiClient(token);
+            const response = await httpClient.delete<ApiResponse<void>>(
+                `${API.PRESCRIPTION}/doctor/prescription/${prescriptionId}`
+            );
+
+            console.log('Doctor Delete Prescription Response:', response.data);
+        } catch (error) {
+            console.error("Error in doctor deleting prescription:", error);
+            throw error;
+        }
+    },
+
+    // Doctor get one patient's detailed prescription (after access granted)
+    getOnePatientDetailPrescription : async (patientId: string, prescriptionId: string, token: string) : Promise<PrescriptionResponse> => {
+        try {
+            const httpClient = createServerApiClient(token);
+            const response = await httpClient.get<ApiResponse<PrescriptionResponse>>(
+                `${API.PRESCRIPTION}/doctor/${patientId}/${prescriptionId}`
+            );
+
+            console.log('Get One Patient Detail Prescription Response:', response.data);
+
+            if (!response.data || !response.data.result) {
+                throw new Error('Invalid response format');
+            }
+
+            return response.data.result;
+        } catch (error) {
+            console.error("Error in fetching patient prescription detail:", error);
             throw error;
         }
     }

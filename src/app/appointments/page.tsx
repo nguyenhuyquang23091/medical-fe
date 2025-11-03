@@ -35,6 +35,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { AppointmentSearchBar, type SearchParams } from "@/components/appointments/AppointmentSearchBar"
 
 // Mock data for doctors - replace with real API data
 const mockDoctors = [
@@ -282,6 +283,11 @@ export default function AppointmentsPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [showMoreSpecialities, setShowMoreSpecialities] = useState(false)
 
+  // Search bar state
+  const [searchBarQuery, setSearchBarQuery] = useState("")
+  const [searchBarLocation, setSearchBarLocation] = useState("")
+  const [searchBarDate, setSearchBarDate] = useState<Date | undefined>()
+
   const handleWishlistToggle = (doctorId: string) => {
     setDoctors(prev => prev.map(doctor => 
       doctor.id === doctorId 
@@ -310,20 +316,43 @@ export default function AppointmentsPage() {
     }
   }
 
+  const handleSearchBarChange = (params: SearchParams) => {
+    setSearchBarQuery(params.query)
+    setSearchBarLocation(params.location)
+    setSearchBarDate(params.date)
+  }
+
   const clearAllFilters = () => {
     setSelectedSpecializations([])
     setSelectedGenders([])
     setSearchTerm("")
+    setSearchBarQuery("")
+    setSearchBarLocation("")
+    setSearchBarDate(undefined)
   }
 
   const filteredDoctors = doctors.filter(doctor => {
+    // Sidebar search
     const matchesSearch = doctor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          doctor.specialization.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesSpecialization = selectedSpecializations.length === 0 || 
+    const matchesSpecialization = selectedSpecializations.length === 0 ||
                                  selectedSpecializations.includes(doctor.specialization)
     const matchesGender = selectedGenders.length === 0 // Add gender matching logic when you have gender data
 
-    return matchesSearch && matchesSpecialization && matchesGender
+    // Search bar filters
+    const matchesSearchBarQuery = !searchBarQuery ||
+      doctor.name.toLowerCase().includes(searchBarQuery.toLowerCase()) ||
+      doctor.specialization.toLowerCase().includes(searchBarQuery.toLowerCase()) ||
+      doctor.specialty.toLowerCase().includes(searchBarQuery.toLowerCase())
+
+    const matchesLocation = !searchBarLocation ||
+      doctor.location.toLowerCase().includes(searchBarLocation.toLowerCase())
+
+    // Date filtering logic can be added when you have appointment date data
+    const matchesDate = true // Placeholder for date matching
+
+    return matchesSearch && matchesSpecialization && matchesGender &&
+           matchesSearchBarQuery && matchesLocation && matchesDate
   })
 
   const sortedDoctors = [...filteredDoctors].sort((a, b) => {
@@ -342,8 +371,14 @@ export default function AppointmentsPage() {
   })
 
   return (
-    <div className="flex gap-6 mt-6">
-      {/* Sidebar Filters */}
+    <div className="container mx-auto px-4 py-6 max-w-[1400px]">
+      <div className="space-y-6">
+        {/* Search Bar */}
+        <AppointmentSearchBar onSearch={handleSearchBarChange} />
+
+        {/* Main Layout */}
+        <div className="flex gap-6">
+        {/* Sidebar Filters */}
       <div className="w-80 flex-shrink-0">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-6">
@@ -544,6 +579,8 @@ export default function AppointmentsPage() {
           )}
         </div>
       </div>
+      </div>
+    </div>
     </div>
   )
 }

@@ -10,7 +10,7 @@ export async function middleware(req: NextRequest) {
     const publicRoutes = ["/"];
 
     //routes require authenticaition
-    const protectedRoutes = ["/profile", "/prescriptioon-test", "/appointment"];
+    const protectedRoutes = ["/profile", "/prescriptioon-test", "/appointment" , "/test/search-all-doctors"];
 
     // Role-based routes
     const doctorRoutes = ["/doctor"];

@@ -71,6 +71,7 @@ interface NotificationItemProps {
   onDelete: (id: string) => void
   onAccept?: (id: string) => void
   onDecline?: (id: string) => void
+  isProcessing?: boolean
 }
 
 const NotificationItem: React.FC<NotificationItemProps> = ({
@@ -79,6 +80,7 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   onDelete,
   onAccept,
   onDecline,
+  isProcessing = false,
 }) => {
   const initials = getNotificationInitials(notification.notificationType)
   const avatarUrl = getNotificationAvatar(notification.notificationType)
@@ -176,19 +178,21 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
               e.stopPropagation()
               if (notification.id) onAccept(notification.id)
             }}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold h-9 rounded-md"
+            disabled={isProcessing}
+            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-semibold h-9 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Accept
+            {isProcessing ? "Processing..." : "Accept"}
           </Button>
           <Button
             onClick={(e) => {
               e.stopPropagation()
               if (notification.id) onDecline(notification.id)
             }}
+            disabled={isProcessing}
             variant="outline"
-            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold h-9 rounded-md border-0"
+            className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold h-9 rounded-md border-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Decline
+            {isProcessing ? "Processing..." : "Decline"}
           </Button>
         </div>
       )}
@@ -221,6 +225,8 @@ export const NotificationDropdown: React.FC = () => {
     clearNotification,
     loadNotifications,
   } = useNotifications()
+
+  const [processingIds, setProcessingIds] = useState<Set<string>>(new Set())
 
   const { session } = useAuth()
 
@@ -277,13 +283,21 @@ export const NotificationDropdown: React.FC = () => {
       return
     }
 
+    // Immediately mark as processing
+    setProcessingIds(prev => new Set(prev).add(id))
+
     try {
       // Find the notification to get the requestId from metadata
       const notification = notifications.find(n => n.id === id)
       const requestId = notification?.metadata?.requestId
 
       if (!requestId) {
-        toast.error("Invalid request")
+        toast.error("Invalid request - no requestId found")
+        setProcessingIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(id)
+          return newSet
+        })
         return
       }
 
@@ -295,10 +309,20 @@ export const NotificationDropdown: React.FC = () => {
 
       toast.success("Request approved successfully")
 
-      // WebSocket will update the UI automatically via 'notification_update' event
+      // Reload notifications to get the updated state
+      await loadNotifications()
+
+      // WebSocket will also update the UI via 'notification_update' event
     } catch (error) {
       console.error("Failed to accept invitation:", error)
       toast.error("Failed to approve request")
+    } finally {
+      // Remove from processing state
+      setProcessingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
     }
   }
 
@@ -308,13 +332,21 @@ export const NotificationDropdown: React.FC = () => {
       return
     }
 
+    // Immediately mark as processing
+    setProcessingIds(prev => new Set(prev).add(id))
+
     try {
       // Find the notification to get the requestId from metadata
       const notification = notifications.find(n => n.id === id)
       const requestId = notification?.metadata?.requestId
 
       if (!requestId) {
-        toast.error("Invalid request")
+        toast.error("Invalid request - no requestId found")
+        setProcessingIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(id)
+          return newSet
+        })
         return
       }
 
@@ -326,10 +358,20 @@ export const NotificationDropdown: React.FC = () => {
 
       toast.info("Request declined")
 
-      // WebSocket will update the UI automatically via 'notification_update' event
+      // Reload notifications to get the updated state
+      await loadNotifications()
+
+      // WebSocket will also update the UI via 'notification_update' event
     } catch (error) {
       console.error("Failed to decline invitation:", error)
       toast.error("Failed to decline request")
+    } finally {
+      // Remove from processing state
+      setProcessingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(id)
+        return newSet
+      })
     }
   }
 
@@ -441,6 +483,7 @@ export const NotificationDropdown: React.FC = () => {
                     onDelete={handleDelete}
                     onAccept={handleAccept}
                     onDecline={handleDecline}
+                    isProcessing={notification.id ? processingIds.has(notification.id) : false}
                   />
                 ))}
               </div>

@@ -138,8 +138,8 @@ export default function PatientsPage() {
         }
     }
 
-    const handleViewPrescriptions = (patientId: string) => {
-        router.push(`/doctor/patients/${patientId}/prescriptions`)
+    const handleViewPatientDashboard = (patientId: string) => {
+        router.push(`/doctor/patients/${patientId}/dashboard`)
     }
 
     if (loading) {
@@ -235,10 +235,9 @@ export default function PatientsPage() {
                                 onCheckedChange={handleSelectAll}
                             />
                         </div>
-                        <div className="col-span-3">NAME</div>
+                        <div className="col-span-4">NAME</div>
                         <div className="col-span-2">ID</div>
-                        <div className="col-span-2">ROLE</div>
-                        <div className="col-span-2">DATE OF BIRTH</div>
+                        <div className="col-span-3">DATE OF BIRTH</div>
                         <div className="col-span-2">ACTIONS</div>
                     </div>
 
@@ -253,12 +252,12 @@ export default function PatientsPage() {
                                     />
                                 </div>
 
-                                <div className="col-span-3">
+                                <div className="col-span-4">
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-10 w-10">
                                             <AvatarImage src={patient.avatar} />
                                             <AvatarFallback>
-                                                {patient.firstName[0]}{patient.lastName[0]}
+                                                {patient.firstName?.[0] || ''}{patient.lastName?.[0] || ''}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div>
@@ -274,13 +273,7 @@ export default function PatientsPage() {
                                     <span className="font-medium">{patient.userId}</span>
                                 </div>
 
-                                <div className="col-span-2">
-                                    <Badge className="bg-blue-100 text-blue-800 border-blue-200">
-                                        {patient.role}
-                                    </Badge>
-                                </div>
-
-                                <div className="col-span-2">
+                                <div className="col-span-3">
                                     <div>
                                         <p className="font-medium">{patient.dob}</p>
                                     </div>
@@ -291,13 +284,13 @@ export default function PatientsPage() {
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            onClick={() => handleViewPrescriptions(patient.userId)}
+                                            onClick={() => handleViewPatientDashboard(patient.userId)}
                                             className="flex items-center gap-1 cursor-pointer"
                                         >
                                             <FileText className="h-3 w-3" />
-                                            View Prescriptions
+                                            View Dashboard
                                         </Button>
-                                        
+
                                     </div>
                                 </div>
                             </div>

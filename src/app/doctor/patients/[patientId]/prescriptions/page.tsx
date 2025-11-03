@@ -477,10 +477,10 @@ export default function PatientPrescriptionsPage() {
                                 {prescription.accessStatus === AccessStatus.APPROVED ? (
                                     <Button
                                         className="w-full flex items-center gap-2 cursor-pointer transition-all duration-200 bg-green-600 hover:bg-green-700 text-white"
-                                        onClick={() => router.push(`/doctor/patients/${params.patientId}/dashboard`)}
+                                        onClick={() => router.push(`/doctor/patients/${params.patientId}/prescriptions/${prescription.id}`)}
                                     >
                                         <CheckCircle className="h-4 w-4" />
-                                        View Patient Dashboard
+                                        View Prescription Details
                                     </Button>
                                 ) : prescription.accessStatus === AccessStatus.PENDING ? (
                                     <div className="w-full space-y-3">

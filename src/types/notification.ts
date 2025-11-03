@@ -30,7 +30,7 @@ export interface PageResponse<T> {
 }
 
 export enum NotificationType {
-    ACCESS_REQUEST = 'ACCESS_REQUEST',
+    ACCESS_REQUEST = 'ACCESS_REQUEST', 
     ACCESS_APPROVED = 'ACCESS_APPROVED',
     ACCESS_DENIED = 'ACCESS_DENIED',
     ACCESS_PROCESSED = 'ACCESS_PROCESSED'

@@ -92,3 +92,22 @@ export const unsubscribeFromNotificationUpdates = () => {
         socket.off('notification_update');
     }
 }
+
+export const subscribeToPaymentUpdates = (callback: (data: any) => void) => {
+    if (socket) {
+        socket.off('payment:update');
+        socket.on('payment:update', (data) => {
+            try {
+                callback(data);
+            } catch (error) {
+                console.error('Error in payment:update callback:', error);
+            }
+        });
+    }
+}
+
+export const unsubscribeFromPaymentUpdates = () => {
+    if (socket) {
+        socket.off('payment:update');
+    }
+}

@@ -15,7 +15,12 @@ export const API = {
     PROFILE_AVATAR : "/profile/users/avatar",
     PRESCRIPTION : "/profile/prescription",
     DOCTOR_REQUEST_ACTION : "profile/prescription/access-request",
-    NOTIFICATIONS : "/notifications"
+    NOTIFICATIONS : "/notifications",
+    PAYMENT : "/payment/vn-pay",
+    // Search endpoints
+    SEARCH_DOCTOR : "/search/doctor",
+    SEARCH_ALL_DOCTORS : "/search/allDoctors",
+    SEARCH_SUGGESTIONS : "/search/suggestions"
 }
 
 export const PUBLIC_ENDPOINT  = new Set([

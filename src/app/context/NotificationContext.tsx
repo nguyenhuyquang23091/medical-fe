@@ -63,7 +63,15 @@ const notificationReducer = (state: NotificationState, action: NotificationActio
     case 'UPDATE_NOTIFICATION':
       const updatedNotifications = state.notifications.map(notification =>
         notification.id === action.payload.id
-          ? { ...notification, ...action.payload.updates }
+          ? {
+              ...notification,
+              ...action.payload.updates,
+              // Merge metadata properly to preserve existing fields
+              metadata: {
+                ...notification.metadata,
+                ...action.payload.updates.metadata
+              }
+            }
           : notification
       )
       return {
@@ -327,17 +335,39 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   }, [])
 
   // Handle notification updates (for status changes like REQUEST_STATUS_CHANGED)
+  // Fixed: Removed state.notifications dependency to avoid stale closure
   const handleNotificationUpdate = useCallback((event: any) => {
     // Check if this is a REQUEST_STATUS_CHANGED event
     if (event.notificationType === 'REQUEST_STATUS_CHANGED' && event.notificationId) {
-      // Update the notification's isProcessed field to true
+      // Update the notification directly using dispatch
+      // The reducer will handle finding and updating the notification
+      const updates: Partial<NotificationMessage> = {
+        isProcessed: true,
+        metadata: {
+          status: event.status || event.metadata?.status // Get status from event
+        }
+      }
+
       dispatch({
         type: 'UPDATE_NOTIFICATION',
         payload: {
           id: event.notificationId,
-          updates: { isProcessed: true }
+          updates
         }
       })
+
+      // Show toast notification
+      if (event.status === 'APPROVED' || event.metadata?.status === 'APPROVED') {
+        toast.success('Request approved', {
+          description: 'The access request has been approved',
+          duration: 3000,
+        })
+      } else if (event.status === 'DENIED' || event.metadata?.status === 'DENIED') {
+        toast.info('Request denied', {
+          description: 'The access request has been denied',
+          duration: 3000,
+        })
+      }
     }
   }, [])
 

@@ -99,3 +99,17 @@ export interface PatientPrescriptionUpdateRequest {
     imageURLS?: string[]; // Exact backend field name (all caps "URLS")
     prescriptionData?: PatientPrescriptionDataRequest[];
 }
+
+// Doctor Prescription Data Update (matching backend DoctorPrescriptionDataUpdate)
+export interface DoctorPrescriptionDataUpdate {
+    medicationName: string; // Required
+    dosage: string; // Required
+    frequency: string; // Required
+    instructions?: string; // Optional
+    doctorNotes?: string; // Optional
+}
+
+// Doctor Prescription Update Type (matching backend DoctorPrescriptionUpdateRequest)
+export interface DoctorPrescriptionUpdateRequest {
+    prescriptionData: DoctorPrescriptionDataUpdate[]; // Required, at least one entry
+}

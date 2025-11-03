@@ -5,6 +5,7 @@ import ConditionalChatBot from "@/components/layout/ConditionalChatBot"
 import { Montserrat } from "next/font/google";
 import { AuthProvider } from "@/app/context/AuthContext";
 import { NotificationProvider } from "@/app/context/NotificationContext";
+import { PaymentProvider } from "@/app/context/PaymentContext";
 import { AuthenticatedApp } from "@/components/app/AuthenticatedApp";
 import LoginModal from "@/components/auth/LoginModal";
 import RegisterModal from "@/components/auth/RegisterModal";
@@ -24,18 +25,20 @@ export default function RootLayout({
        <Providers>
         <AuthProvider>
           <NotificationProvider>
-            <AuthenticatedApp>
-              <div>
-                <ConditionalNavbar />
-                <main>
-                  {children}
-                </main>
-                <ConditionalFooter/>
-                <LoginModal/>
-                <RegisterModal/>
-                <ConditionalChatBot/>
-              </div>
-            </AuthenticatedApp>
+            <PaymentProvider>
+              <AuthenticatedApp>
+                <div>
+                  <ConditionalNavbar />
+                  <main>
+                    {children}
+                  </main>
+                  <ConditionalFooter/>
+                  <LoginModal/>
+                  <RegisterModal/>
+                  <ConditionalChatBot/>
+                </div>
+              </AuthenticatedApp>
+            </PaymentProvider>
           </NotificationProvider>
         </AuthProvider>
         </Providers>

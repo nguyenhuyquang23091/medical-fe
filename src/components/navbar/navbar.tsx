@@ -50,7 +50,7 @@ export default function Navbar(){
         { title: "Home", href: "/" },
         { title: "Blog", href: "/" },
         { title: "Page", href: "/" },
-        {title : "Appointments", href: "/appointments"},
+        {title : "Doctors", href: "/appointments"},
         { title: "Contact", href: "/" },
     ];
 

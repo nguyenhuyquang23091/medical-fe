@@ -234,19 +234,7 @@ export default function PatientDashboardPage() {
         setPatientProfile(patient)
       } catch (error: any) {
         console.error('Failed to load patient data:', error)
-
-        if (error?.response?.status === 403 || error?.response?.status === 401) {
-          setError('Access denied. You need approved access to view this patient.')
-          toast.error('Access Denied', {
-            description: 'You do not have permission to view this patient data.',
-          })
-          // Redirect back to prescriptions page
-          setTimeout(() => {
-            router.push(`/doctor/patients/${params.patientId}/prescriptions`)
-          }, 2000)
-        } else {
-          setError('Failed to load patient data.')
-        }
+        setError('Failed to load patient data. Please try again.')
       } finally {
         setIsLoading(false)
       }
@@ -274,7 +262,11 @@ export default function PatientDashboardPage() {
 
   const { recentReading, average } = calculateStats(currentData)
 
-  const handleBackToPrescriptions = () => {
+  const handleBackToPatients = () => {
+    router.push(`/doctor/patients`)
+  }
+
+  const handleViewAllPrescriptions = () => {
     router.push(`/doctor/patients/${params.patientId}/prescriptions`)
   }
 
@@ -300,8 +292,8 @@ export default function PatientDashboardPage() {
           <h1 className="text-2xl font-bold text-red-600 mb-4">
             {error || 'Patient not found'}
           </h1>
-          <Button onClick={() => router.push(`/doctor/patients/${params.patientId}/prescriptions`)}>
-            Back to Prescriptions
+          <Button onClick={() => router.push('/doctor/patients')}>
+            Back to Patients List
           </Button>
         </div>
       </div>
@@ -317,11 +309,11 @@ export default function PatientDashboardPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={handleBackToPrescriptions}
+              onClick={handleBackToPatients}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Prescriptions
+              Back to Patients
             </Button>
             <div className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
@@ -345,7 +337,7 @@ export default function PatientDashboardPage() {
             <h1 className="text-3xl font-bold text-gray-900">
               {patientProfile.firstName} {patientProfile.lastName}'s Health Dashboard
             </h1>
-            <p className="text-gray-600">Comprehensive health overview with granted access.</p>
+            <p className="text-gray-600">Comprehensive health overview. Click "See All Prescriptions" to view detailed records.</p>
           </div>
 
           {/* Patient Profile Header */}
@@ -424,9 +416,9 @@ export default function PatientDashboardPage() {
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Access Status</h3>
-                      <Badge className="bg-green-100 text-green-800 border-green-200">
-                        ✓ Access Granted
+                      <h3 className="text-sm font-medium text-muted-foreground mb-1">Dashboard Access</h3>
+                      <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                        Public View
                       </Badge>
                     </div>
                   </div>
@@ -554,8 +546,12 @@ export default function PatientDashboardPage() {
                 <FileText className="w-5 h-5 text-gray-600" />
                 <CardTitle className="text-xl font-semibold">Latest Prescriptions</CardTitle>
               </div>
-              <Button variant="ghost" className="text-blue-500 hover:text-blue-600 text-sm">
-                See all
+              <Button
+                variant="ghost"
+                className="text-blue-500 hover:text-blue-600 text-sm"
+                onClick={handleViewAllPrescriptions}
+              >
+                See All Prescriptions
               </Button>
             </CardHeader>
             <CardContent>
