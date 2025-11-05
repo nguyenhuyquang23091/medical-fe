@@ -21,13 +21,6 @@ export interface NotificationMessage {
     } | null;
 }
 
-export interface PageResponse<T> {
-    currentPage: number;
-    totalPages: number;
-    pageSize: number;
-    totalElements: number;
-    data: T[];
-}
 
 export enum NotificationType {
     ACCESS_REQUEST = 'ACCESS_REQUEST', 

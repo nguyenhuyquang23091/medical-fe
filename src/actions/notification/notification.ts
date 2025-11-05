@@ -1,7 +1,7 @@
 import { createServerApiClient } from "@/lib/serverApiClient";
 import { API } from "@/lib/config/configuration";
-import { ApiResponse } from "@/types";
-import { NotificationMessage, PageResponse } from "@/types/notification";
+import { ApiResponse, PageResponse } from "@/types";
+import { NotificationMessage } from "@/types/notification";
 
 const notificationService  = {
     getMyNotifications : async(token : string, page: number = 1, size: number = 10) : Promise<PageResponse<NotificationMessage>> => {

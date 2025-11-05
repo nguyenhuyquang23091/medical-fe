@@ -1,6 +1,7 @@
 import { createServerApiClient } from "@/lib/serverApiClient";
 import { API } from "@/lib/config/configuration";
 import { ProfileUpdateRequest, ProfileResponse, ApiResponse } from "@/types";
+import { DoctorProfileResponse } from "@/types/doctorProfile";
 
 const profileService = {
     updateProfile: async (request: ProfileUpdateRequest, token: string): Promise<ProfileResponse> => {
@@ -34,10 +35,10 @@ const profileService = {
     
 
     deleteProfileAvatar : async (token : string) : Promise<ProfileResponse> => {
-        try { 
+        try {
             const apiClient = createServerApiClient(token);
             const response = await apiClient.delete<ApiResponse<ProfileResponse>>(`${API.PROFILE_AVATAR}`)
-            
+
             if(!response.data || !response.data.result){
                 throw new Error("Invalid response format")
             }
@@ -45,6 +46,25 @@ const profileService = {
             return response.data.result
         } catch(error){
             console.error("Errow while deleting profile", error)
+            throw error;
+        }
+    },
+
+   
+    getOneDoctorProfile: async (doctorId: string, token: string): Promise<DoctorProfileResponse> => {
+        try {
+            const apiClient = createServerApiClient(token);
+            const response = await apiClient.get<ApiResponse<DoctorProfileResponse>>(
+                `${API.GET_ONE_DOCTOR_PROFILE}/${doctorId}`
+            );
+
+            if (!response.data || !response.data.result) {
+                throw new Error("Invalid response format");
+            }
+
+            return response.data.result;
+        } catch (error) {
+            console.error("Error fetching doctor profile:", error);
             throw error;
         }
     }

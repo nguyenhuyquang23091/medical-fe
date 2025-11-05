@@ -1,8 +1,10 @@
 "use client"
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback, ReactNode } from 'react'
-import { NotificationMessage, NotificationState, NotificationContextType, NotificationType, PageResponse } from '@/types/notification'
+import { NotificationMessage, NotificationState, NotificationContextType, NotificationType } from '@/types/notification'
 import { useAuth } from './AuthContext'
+import { PageResponse } from "@/types";
+
 import notificationService from '@/actions/notification/notification'
 import {
   initSocketIo,

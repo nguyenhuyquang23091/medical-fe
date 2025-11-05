@@ -185,10 +185,11 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({
                 max={10000000}
                 value={[filters.minPrice || 0, filters.maxPrice || 10000000]}
                 onChangeAction={(value) => {
-                  onFilterChangeAction({
+                  const priceFilters = {
                     minPrice: value[0] === 0 ? undefined : value[0],
                     maxPrice: value[1] === 10000000 ? undefined : value[1],
-                  });
+                  };
+                  onFilterChangeAction(priceFilters);
                 }}
                 formatValue={(val) => `${val.toLocaleString('vi-VN')}₫`}
               />

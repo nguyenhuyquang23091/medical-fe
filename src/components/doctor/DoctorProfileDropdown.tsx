@@ -42,7 +42,19 @@ export function DoctorProfileDropdown({
     `${userProfile.firstName[0]}${userProfile.lastName[0]}`.toUpperCase() : "D"
 
   if (!isMounted) {
-    return null
+    return (
+      <SidebarMenuButton size="lg" disabled>
+        <Avatar className="h-8 w-8 rounded-lg">
+          <AvatarFallback className="rounded-lg bg-primary text-primary-foreground font-medium">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="grid flex-1 text-left text-sm leading-tight">
+          <span className="truncate font-semibold">Loading...</span>
+          <span className="truncate text-xs text-muted-foreground">...</span>
+        </div>
+      </SidebarMenuButton>
+    )
   }
 
   return (

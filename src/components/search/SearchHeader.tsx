@@ -8,6 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Grid3x3, List, Map } from "lucide-react";
 
 interface SearchHeaderProps {
@@ -18,6 +19,8 @@ interface SearchHeaderProps {
   onSortChangeAction: (sort: string) => void;
   currentPage: number;
   totalPages: number;
+  availabilityFilter: boolean;
+  onAvailabilityFilterChangeAction: (filter: boolean) => void;
 }
 
 export const SearchHeader: React.FC<SearchHeaderProps> = ({
@@ -28,6 +31,8 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
   onSortChangeAction,
   currentPage,
   totalPages,
+  availabilityFilter,
+  onAvailabilityFilterChangeAction,
 }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
@@ -47,6 +52,19 @@ export const SearchHeader: React.FC<SearchHeaderProps> = ({
 
         {/* Controls */}
         <div className="flex items-center gap-3">
+          {/* Availability Filter Toggle */}
+          <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-2">
+            <label htmlFor="availability-toggle" className="text-sm font-medium text-gray-700 cursor-pointer">
+              Availability
+            </label>
+            <Switch
+              id="availability-toggle"
+              checked={availabilityFilter}
+              onCheckedChange={onAvailabilityFilterChangeAction}
+              className="data-[state=checked]:bg-green-600"
+            />
+          </div>
+
           {/* Sort Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Sort by:</span>

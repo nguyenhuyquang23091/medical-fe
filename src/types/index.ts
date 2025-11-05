@@ -20,7 +20,7 @@ export * from './validation';
 export * from './ui';
 
 // Patient types
-export * from './patient';
+export * from './patientProfile';
 
 // Prescription types
 export * from './prescription';

@@ -3,8 +3,9 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
+import debounce from "lodash.debounce";
 import doctorSearchService from "@/actions/search/doctorSearch";
 import { SearchSuggestion, SuggestionType } from "@/types/search";
 
@@ -23,7 +24,6 @@ export const SearchBar: React.FC<SearchBarProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [loading, setLoading] = useState(false);
-  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleSearch = () => {
@@ -59,7 +59,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     onSearchAction(suggestion.text);
   };
 
-  const fetchSuggestions = async (term: string) => {
+  const fetchSuggestions = useCallback(async (term: string) => {
     if (!term || term.length < 2 || !session?.accessToken) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -81,21 +81,18 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.accessToken]);
+
+  // Debounced version of fetchSuggestions
+  const debouncedFetchSuggestions = useMemo(
+    () => debounce(fetchSuggestions, 300),
+    [fetchSuggestions]
+  );
 
   const handleInputChange = (value: string) => {
     setSearchTerm(value);
     setSelectedIndex(-1);
-
-    // Clear existing timeout
-    if (debounceTimeout.current) {
-      clearTimeout(debounceTimeout.current);
-    }
-
-    // Debounce suggestions fetch
-    debounceTimeout.current = setTimeout(() => {
-      fetchSuggestions(value);
-    }, 300);
+    debouncedFetchSuggestions(value);
   };
 
 
@@ -113,11 +110,9 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      if (debounceTimeout.current) {
-        clearTimeout(debounceTimeout.current);
-      }
+      debouncedFetchSuggestions.cancel();
     };
-  }, []);
+  }, [debouncedFetchSuggestions]);
 
   return (
     <div ref={wrapperRef} className="relative w-full">

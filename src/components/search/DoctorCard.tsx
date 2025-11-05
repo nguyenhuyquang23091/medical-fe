@@ -1,6 +1,6 @@
 "use client";
 
-import { DoctorProfileResponse } from "@/types/search";
+import { DoctorProfileResponse } from "@/types/doctorProfile";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
   Award,
 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface DoctorCardProps {
   doctor: DoctorProfileResponse;
@@ -24,6 +25,7 @@ interface DoctorCardProps {
 export const DoctorCard: React.FC<DoctorCardProps> = ({
   doctor,
 }) => {
+  const router = useRouter();
   const [isFavorite, setIsFavorite] = useState(false);
 
   // Calculate average price from services
@@ -33,12 +35,17 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
         doctor.services.length
       : 0;
 
-  // Get display specialties
+  // Get display specialties with null safety
   const displaySpecialties = doctor.specialties?.slice(0, 3) || [];
 
-  // Format rating (using mock data for now)
-  const rating = 4.5; // Would come from backend
-  const totalVotes = 287; // Would come from backend
+  // Compute full name from first and last name
+  const fullName = `${doctor.firstName || ""} ${doctor.lastName || ""}`.trim() || "Unknown";
+
+  const handleBookAppointment = () => {
+    // Use userId for booking endpoint (not id or doctorProfileId)
+    router.push(`/booking/${doctor.userId}`);
+  };
+
 
   return (
     <Card className="bg-white border border-gray-200 rounded-lg hover:shadow-lg transition-shadow duration-200 relative">
@@ -60,9 +67,9 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
           {/* Doctor Image */}
           <div className="flex-shrink-0">
             <Avatar className="w-28 h-28 border-4 border-gray-100">
-              <AvatarImage src={doctor.avatar || undefined} alt={doctor.fullName || "Doctor"} />
+              <AvatarImage src={doctor.avatar || undefined} alt={fullName} />
               <AvatarFallback className="text-2xl bg-gradient-to-br from-blue-400 to-blue-600 text-white">
-                {doctor.fullName?.charAt(0) || "D"}
+                {fullName.charAt(0)}
               </AvatarFallback>
             </Avatar>
           </div>
@@ -74,20 +81,11 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h3 className="text-xl font-bold text-gray-900 hover:text-blue-600 cursor-pointer">
-                    Dr. {doctor.fullName || "Unknown"}
+                    Dr. {fullName}
                   </h3>
                 </div>
 
-                {/* Rating */}
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold text-gray-900">{rating}</span>
-                    <span className="text-sm text-gray-500">
-                      ({totalVotes} reviews)
-                    </span>
-                  </div>
-                </div>
+               
               </div>
 
               {/* Favorite Button */}
@@ -107,15 +105,22 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
 
             {/* Specialties */}
             <div className="flex flex-wrap gap-2 mb-3">
-              {displaySpecialties.map((specialty) => (
-                <Badge
-                  key={specialty.relationshipId}
-                  variant="outline"
-                  className="bg-blue-50 text-blue-700 border-blue-200"
-                >
-                  {specialty.specialtyName}
+              {displaySpecialties
+                .filter((specialty) => specialty && specialty.specialty?.name)
+                .map((specialty) => (
+                  <Badge
+                    key={specialty.relationshipId}
+                    variant="outline"
+                    className="bg-blue-50 text-blue-700 border-blue-200"
+                  >
+                    {specialty.specialty.name}
+                  </Badge>
+                ))}
+              {displaySpecialties.length === 0 && (
+                <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
+                  No specialties available
                 </Badge>
-              ))}
+              )}
             </div>
 
             {/* Details Grid */}
@@ -167,14 +172,17 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
               <div className="mb-4">
                 <p className="text-xs text-gray-500 mb-1">Services:</p>
                 <div className="flex flex-wrap gap-1">
-                  {doctor.services.slice(0, 3).map((service) => (
-                    <span
-                      key={service.relationshipId}
-                      className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
-                    >
-                      {service.serviceName}
-                    </span>
-                  ))}
+                  {doctor.services
+                    .filter((service) => service && service.service?.name)
+                    .slice(0, 3)
+                    .map((service) => (
+                      <span
+                        key={service.relationshipId}
+                        className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                      >
+                        {service.service.name}
+                      </span>
+                    ))}
                   {doctor.services.length > 3 && (
                     <span className="text-xs text-gray-500 px-2 py-1">
                       +{doctor.services.length - 3} more
@@ -190,7 +198,10 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span>Next available: Today, 3:00 PM</span>
               </div>
-              <Button className="bg-teal-500 hover:bg-teal-600 text-white">
+              <Button
+                onClick={handleBookAppointment}
+                className="bg-teal-500 hover:bg-teal-600 text-white"
+              >
                 Book Appointment
               </Button>
             </div>

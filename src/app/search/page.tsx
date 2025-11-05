@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import doctorSearchService from "@/actions/search/doctorSearch";
-import { DoctorProfileResponse, SearchFilter } from "@/types/search";
+import { SearchFilter } from "@/types/search";
+import { DoctorProfileResponse } from "@/types/doctorProfile";
 import { FilterSidebar } from "@/components/search/FilterSidebar";
 import { SearchHeader } from "@/components/search/SearchHeader";
 import { DoctorCard } from "@/components/search/DoctorCard";
@@ -21,52 +22,95 @@ export default function SearchPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<string>("relevance");
+  const [availabilityFilter, setAvailabilityFilter] = useState<boolean>(false);
+
+  // AbortController for cancelling requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Filter state
   const [filters, setFilters] = useState<SearchFilter>({
     term: "",
   });
 
-  const handleSearch = async () => {
+  // Stable reference to access token to prevent unnecessary re-renders
+  const accessToken = session?.accessToken;
+  const hasAccessToken = !!accessToken;
+
+  const handleSearch = async (customFilters?: SearchFilter) => {
     if (!session?.accessToken) {
       setError("Please log in to search");
       return;
     }
 
+    // Cancel any pending requests
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       setLoading(true);
       setError(null);
 
-      // Clean up empty values
+      // Use custom filters if provided, otherwise use current state
+      const filtersToUse = customFilters || filters;
+
+      // Clean up empty values (keep false boolean values)
       const cleanFilters: SearchFilter = Object.fromEntries(
-        Object.entries(filters).filter(([, value]) => {
-          if (value === "" || value === undefined) return false;
+        Object.entries(filtersToUse).filter(([key, value]) => {
+          if (value === "" || value === undefined || value === null) return false;
           if (Array.isArray(value) && value.length === 0) return false;
+          // Keep boolean false values (important for isAvailable filter)
+          if (typeof value === 'boolean') return true;
           return true;
         })
       ) as SearchFilter;
 
       const response = await doctorSearchService.searchDoctors(
         cleanFilters,
-        session.accessToken
+        session.accessToken,
+        abortController.signal
       );
 
-      setDoctors(response.data);
-      setTotalResults(response.totalElements);
-      setCurrentPage(response.currentPage);
-      setTotalPages(response.totalPages);
+      // Only update state if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setDoctors(response.data);
+        setTotalResults(response.totalElements);
+        setCurrentPage(response.currentPage);
+        setTotalPages(response.totalPages);
+      }
     } catch (err) {
+      // Don't show error if request was aborted (silently ignore)
+      if (err instanceof Error && (err.name === "AbortError" || err.name === "CanceledError")) {
+        return;
+      }
       console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {
-      setLoading(false);
+      // Only clear loading if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
   const handleFilterChange = (newFilters: Partial<SearchFilter>) => {
+    // Ensure we only pass serializable data
+    const cleanNewFilters: Partial<SearchFilter> = {};
+    Object.entries(newFilters).forEach(([key, value]) => {
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === undefined) {
+        (cleanNewFilters as any)[key] = value;
+      } else if (Array.isArray(value) && value.every(item => typeof item === 'string' || typeof item === 'number')) {
+        (cleanNewFilters as any)[key] = value;
+      }
+    });
+
     setFilters((prev) => ({
       ...prev,
-      ...newFilters,
+      ...cleanNewFilters,
     }));
   };
 
@@ -90,31 +134,65 @@ export default function SearchPage() {
     setTimeout(() => handleSearch(), 100);
   };
 
+  const handleAvailabilityFilterChange = (filter: boolean) => {
+    setAvailabilityFilter(filter);
+    const newFilters = {
+      ...filters,
+      // When toggle is OFF (false), don't filter by availability (undefined = all doctors)
+      // When toggle is ON (true), filter for available doctors (true)
+      isAvailable: filter ? true : undefined,
+    };
+    setFilters(newFilters);
+    // Trigger search immediately with new filters (don't wait for state update)
+    handleSearch(newFilters);
+  };
+
   // Load all doctors on initial page load
   useEffect(() => {
+    const abortController = new AbortController();
+
     const loadInitialDoctors = async () => {
-      if (!session?.accessToken) return;
+      if (!accessToken) return;
 
       try {
         setLoading(true);
         const response = await doctorSearchService.searchAllDoctors(
           1, // page (1-based pagination)
           10, // size
-          session.accessToken
+          accessToken,
+          abortController.signal
         );
-        setDoctors(response.data);
-        setTotalResults(response.totalElements);
-        setCurrentPage(response.currentPage);
-        setTotalPages(response.totalPages);
+
+        // Only update if not aborted
+        if (!abortController.signal.aborted) {
+          setDoctors(response.data);
+          setTotalResults(response.totalElements);
+          setCurrentPage(response.currentPage);
+          setTotalPages(response.totalPages);
+        }
       } catch (err) {
+        // Don't log or show error if request was aborted (silently ignore)
+        if (err instanceof Error && (err.name === "AbortError" || err.name === "CanceledError")) {
+          return;
+        }
         console.error("Error loading initial doctors:", err);
+        if (!abortController.signal.aborted) {
+          setError("Failed to load doctors");
+        }
       } finally {
-        setLoading(false);
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     loadInitialDoctors();
-  }, [session?.accessToken]);
+
+    // Cleanup: abort request if component unmounts
+    return () => {
+      abortController.abort();
+    };
+  }, [hasAccessToken]); // Use boolean to prevent re-renders when session object changes
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50">
@@ -188,6 +266,8 @@ export default function SearchPage() {
               onSortChangeAction={setSortBy}
               currentPage={currentPage}
               totalPages={totalPages}
+              availabilityFilter={availabilityFilter}
+              onAvailabilityFilterChangeAction={handleAvailabilityFilterChange}
             />
 
             {/* Error Display */}
@@ -230,7 +310,7 @@ export default function SearchPage() {
               >
                 {doctors.map((doctor) => (
                   <DoctorCard
-                    key={doctor.doctorProfileId}
+                    key={doctor.userId}
                     doctor={doctor}
                     viewMode={viewMode}
                   />

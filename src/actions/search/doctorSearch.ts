@@ -1,26 +1,25 @@
 import { createServerApiClient } from "@/lib/serverApiClient";
 import { API } from "@/lib/config/configuration";
 import {
-  ApiResponse,
-  DoctorProfileResponse,
-  PageResponse,
   SearchFilter,
   SearchSuggestion,
 } from "@/types/search";
+import { ApiResponse, PageResponse } from "@/types";
+import { DoctorProfileResponse } from "@/types/doctorProfile";
+
 
 const doctorSearchService = {
 
   searchDoctors: async (
     searchFilter: SearchFilter,
-    token: string
+    token: string,
+    signal?: AbortSignal
   ): Promise<PageResponse<DoctorProfileResponse>> => {
     try {
       const httpClient = createServerApiClient(token);
       const response = await httpClient.post<
         ApiResponse<PageResponse<DoctorProfileResponse>>
-      >(API.SEARCH_DOCTOR, searchFilter);
-
-      console.log("Search Doctors Response:", response.data);
+      >(API.SEARCH_DOCTOR, searchFilter, { signal });
 
       if (!response.data || !response.data.result) {
         throw new Error("Invalid response format");
@@ -28,6 +27,10 @@ const doctorSearchService = {
 
       return response.data.result;
     } catch (error) {
+      // Don't log AbortError as it's expected when requests are cancelled
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
       console.error("Error searching doctors:", error);
       throw error;
     }
@@ -36,7 +39,8 @@ const doctorSearchService = {
   searchAllDoctors: async (
     page: number = 2,
     size: number = 10,
-    token: string
+    token: string,
+    signal?: AbortSignal
   ): Promise<PageResponse<DoctorProfileResponse>> => {
     try {
       const httpClient = createServerApiClient(token);
@@ -47,9 +51,8 @@ const doctorSearchService = {
           page,
           size,
         },
+        signal,
       });
-
-      console.log("Search All Doctors Response:", response.data);
 
       if (!response.data || !response.data.result) {
         throw new Error("Invalid response format");
@@ -57,6 +60,10 @@ const doctorSearchService = {
 
       return response.data.result;
     } catch (error) {
+      // Don't log AbortError as it's expected when requests are cancelled
+      if (error instanceof Error && error.name === "AbortError") {
+        throw error;
+      }
       console.error("Error fetching all doctors:", error);
       throw error;
     }
@@ -86,11 +93,9 @@ const doctorSearchService = {
             term,
             limit,
           },
-          signal, // Add AbortSignal for request cancellation
+          signal,
         }
       );
-
-      console.log("Search Suggestions Response:", response.data);
 
       if (!response.data || !response.data.result) {
         throw new Error("Invalid response format");
@@ -102,7 +107,6 @@ const doctorSearchService = {
       if (error instanceof Error && error.name === "AbortError") {
         throw error;
       }
-
       console.error("Error fetching search suggestions:", error);
       throw error;
     }

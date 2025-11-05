@@ -32,11 +32,24 @@ export function ProfileDropdown({
        avatar: userProfile?.avatar || "/placeholder.svg"
    };
 
-    const initials = userProfile?.firstName && userProfile?.lastName ? 
+    const initials = userProfile?.firstName && userProfile?.lastName ?
         `${userProfile.firstName[0]}${userProfile.lastName[0]}`.toUpperCase() : "L";
-    
+
     if (!isMounted) {
-        return null;
+        return (
+            <Button
+              variant="ghost"
+              className="relative h-10 w-10 rounded-full"
+              aria-label="Loading user menu"
+              disabled
+            >
+              <Avatar className="h-10 w-10">
+                <AvatarFallback className="bg-primary text-primary-foreground font-medium">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+        );
     }
 
 return (
